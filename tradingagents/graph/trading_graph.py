@@ -264,15 +264,20 @@ class TradingAgentsGraph:
             stock = pd.DataFrame()
             spy = pd.DataFrame()
 
-            # Try yfinance first (works for US stocks)
-            try:
-                stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
-                spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
-            except Exception:
-                stock = pd.DataFrame()
-                spy = pd.DataFrame()
+            is_chinese = self._is_chinese_ticker(ticker)
 
-            # If yfinance failed or returned empty, try A-share data
+            # For A-share / HK tickers, skip yfinance entirely — it will
+            # either return no data or hit rate limits.  Go straight to
+            # the tencent_sina / East Money backend.
+            if not is_chinese:
+                try:
+                    stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
+                    spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
+                except Exception:
+                    stock = pd.DataFrame()
+                    spy = pd.DataFrame()
+
+            # Try A-share / HK data source (also used as fallback)
             if len(stock) < 2:
                 try:
                     from tradingagents.dataflows.tencent_sina import get_YFin_data_online
