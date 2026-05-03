@@ -1,5 +1,6 @@
 from typing import Optional
 import datetime
+import re
 import typer
 from pathlib import Path
 from functools import wraps
@@ -37,7 +38,32 @@ app = typer.Typer(
     name="TradingAgents",
     help="TradingAgents CLI: Multi-Agents LLM Financial Trading Framework",
     add_completion=True,  # Enable shell completion
+    invoke_without_command=True,
 )
+
+
+@app.callback()
+def main(
+    ctx: typer.Context,
+    checkpoint: bool = typer.Option(
+        False,
+        "--checkpoint",
+        help="Enable checkpoint/resume: save state after each node so a crashed run can resume.",
+    ),
+    clear_checkpoints: bool = typer.Option(
+        False,
+        "--clear-checkpoints",
+        help="Delete all saved checkpoints before running (force fresh start).",
+    ),
+):
+    """TradingAgents CLI: Multi-Agents LLM Financial Trading Framework"""
+    if ctx.invoked_subcommand is not None:
+        return
+    if clear_checkpoints:
+        from tradingagents.graph.checkpointer import clear_all_checkpoints
+        n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
+        console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
+    run_analysis(checkpoint=checkpoint)
 
 
 # Create a deque to store recent messages with a maximum length
@@ -640,6 +666,12 @@ def save_report_to_disk(final_state, ticker: str, save_path: Path):
     """Save complete analysis report to disk with organized subfolders."""
     save_path.mkdir(parents=True, exist_ok=True)
     sections = []
+    # Derive analysis date from directory name (e.g. TICKER_20260503_172233)
+    _date_match = re.search(r"(\d{8})", save_path.name)
+    analysis_date_str = (
+        f"{_date_match.group(1)[:4]}-{_date_match.group(1)[4:6]}-{_date_match.group(1)[6:8]}"
+        if _date_match else datetime.datetime.now().strftime("%Y-%m-%d")
+    )
 
     # 1. Analysts
     analysts_dir = save_path / "1_analysts"
@@ -722,8 +754,21 @@ def save_report_to_disk(final_state, ticker: str, save_path: Path):
 
     # Write consolidated report
     header = f"# Trading Analysis Report: {ticker}\n\nGenerated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-    (save_path / "complete_report.md").write_text(header + "\n\n".join(sections), encoding="utf-8")
-    return save_path / "complete_report.md"
+    complete_md = save_path / "complete_report.md"
+    complete_md.write_text(header + "\n\n".join(sections), encoding="utf-8")
+
+    # Convert to professional Word document (best-effort)
+    try:
+        from tradingagents.utils.report_converter import convert_report_dir_to_docx
+        docx_path = convert_report_dir_to_docx(
+            save_path, ticker=ticker, analysis_date=analysis_date_str,
+        )
+        console.log(f"[green]Word report generated:[/green] {docx_path}")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to generate Word report: %s", e)
+
+    return complete_md
 
 
 def display_complete_report(final_state):
@@ -1044,6 +1089,12 @@ def run_analysis(checkpoint: bool = False):
         update_display(layout, spinner_text, stats_handler=stats_handler, start_time=start_time)
 
         # Initialize state and get graph args with callbacks
+        # Auto-detect A-share / HK tickers so tencent_sina is used instead of
+        # hitting yfinance rate limits.  propagate() does this automatically,
+        # but the CLI streams the graph directly, so we must call it here.
+        graph._auto_detect_vendor(selections["ticker"])
+        graph._resolve_pending_entries(selections["ticker"])
+
         init_agent_state = graph.propagator.create_initial_state(
             selections["ticker"], selections["analysis_date"]
         )
@@ -1171,6 +1222,16 @@ def run_analysis(checkpoint: bool = False):
 
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
 
+    # Convert report_dir MDs to Word (best-effort, post-stream)
+    try:
+        from tradingagents.utils.report_converter import convert_report_dir_to_docx
+        convert_report_dir_to_docx(
+            report_dir, ticker=selections["ticker"],
+            analysis_date=selections["analysis_date"],
+        )
+    except Exception:
+        pass
+
     # Post-analysis prompts (outside Live context for clean interaction)
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
 
@@ -1198,23 +1259,51 @@ def run_analysis(checkpoint: bool = False):
 
 
 @app.command()
-def analyze(
-    checkpoint: bool = typer.Option(
-        False,
-        "--checkpoint",
-        help="Enable checkpoint/resume: save state after each node so a crashed run can resume.",
+def report(
+    report_dir: str = typer.Argument(
+        ...,
+        help="Path to the report directory (e.g. reports/NVDA_20260115_120000).",
     ),
-    clear_checkpoints: bool = typer.Option(
-        False,
-        "--clear-checkpoints",
-        help="Delete all saved checkpoints before running (force fresh start).",
+    output: Optional[str] = typer.Option(
+        None,
+        "--output", "-o",
+        help="Output .docx file path. Defaults to <report_dir>/综合分析报告.docx.",
+    ),
+    ticker: Optional[str] = typer.Option(
+        None,
+        "--ticker", "-t",
+        help="Ticker symbol for cover page (auto-detected from directory name if omitted).",
+    ),
+    date: Optional[str] = typer.Option(
+        None,
+        "--date", "-d",
+        help="Analysis date for cover page, YYYY-MM-DD (auto-detected if omitted).",
     ),
 ):
-    if clear_checkpoints:
-        from tradingagents.graph.checkpointer import clear_all_checkpoints
-        n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
-        console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
-    run_analysis(checkpoint=checkpoint)
+    """Convert a saved report directory (with MD files) to a professional Word document."""
+    from tradingagents.utils.report_converter import convert_report_dir_to_docx
+
+    report_path = Path(report_dir)
+    if not report_path.is_dir():
+        console.print(f"[red]Error: Directory not found: {report_dir}[/red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[cyan]Generating Word report from:[/cyan] {report_path.resolve()}")
+
+    try:
+        docx_path = convert_report_dir_to_docx(
+            report_path,
+            output_path=output,
+            ticker=ticker,
+            analysis_date=date,
+        )
+        console.print(f"[green]Done. Word report saved to:[/green] {docx_path}")
+    except FileNotFoundError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[red]Error generating report: {e}[/red]")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

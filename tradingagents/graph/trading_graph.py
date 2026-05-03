@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Tuple, List, Optional
 
 import yfinance as yf
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +189,64 @@ class TradingAgentsGraph:
             ),
         }
 
+    @staticmethod
+    def _is_chinese_ticker(ticker: str) -> bool:
+        """Return True if ticker looks like an A-share or HK stock code.
+
+        A-share: 6-digit number (600183, 300308, 000001) optionally with
+        .SS / .SZ / .SH suffix, or sh/sz prefix.
+        HK:      5-digit number with .HK suffix or hk prefix (02149.HK).
+        """
+        t = str(ticker).strip().lower()
+        # Strip known prefixes
+        for prefix in ("sh", "sz", "hk"):
+            if t.startswith(prefix):
+                t = t[len(prefix):]
+                break
+        # Strip exchange suffixes
+        for suffix in (".sz", ".ss", ".sh", ".hk"):
+            if t.endswith(suffix):
+                t = t[: -len(suffix)]
+                break
+        # A-share: 6-digit number
+        if len(t) == 6 and t.isdigit():
+            return True
+        # HK: 4-5 digit number (after stripping .HK)
+        if 4 <= len(t) <= 5 and t.isdigit():
+            return True
+        return False
+
+    def _auto_detect_vendor(self, ticker: str):
+        """Switch data_vendors to tencent_sina if ticker is A-share / HK.
+
+        Only switches when the current vendor config is still the default
+        (yfinance).  If the user has explicitly set a vendor, we leave it.
+        """
+        if not self._is_chinese_ticker(ticker):
+            return
+
+        current_vendors = self.config.get("data_vendors", {})
+        # If any category is already explicitly non-yfinance, respect that.
+        non_default = [v for v in current_vendors.values()
+                       if v not in ("yfinance", "default")]
+        if non_default:
+            return
+
+        ts = "tencent_sina"
+        self.config.setdefault("data_vendors", {})
+        self.config["data_vendors"] = {
+            "core_stock_apis": ts,
+            "technical_indicators": ts,
+            "fundamental_data": ts,
+            "news_data": ts,
+        }
+        # Propagate to the dataflows config module so route_to_vendor picks it up.
+        set_config(self.config)
+        logger.info(
+            "Auto-detected A-share/HK ticker '%s' — switched data_vendors to tencent_sina",
+            ticker,
+        )
+
     def _fetch_returns(
         self, ticker: str, trade_date: str, holding_days: int = 5
     ) -> Tuple[Optional[float], Optional[float], Optional[int]]:
@@ -202,22 +261,53 @@ class TradingAgentsGraph:
             end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
             end_str = end.strftime("%Y-%m-%d")
 
-            stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
-            spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
+            stock = pd.DataFrame()
+            spy = pd.DataFrame()
 
-            if len(stock) < 2 or len(spy) < 2:
+            # Try yfinance first (works for US stocks)
+            try:
+                stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
+                spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
+            except Exception:
+                stock = pd.DataFrame()
+                spy = pd.DataFrame()
+
+            # If yfinance failed or returned empty, try A-share data
+            if len(stock) < 2:
+                try:
+                    from tradingagents.dataflows.tencent_sina import get_YFin_data_online
+                    import io as _io
+                    csv_str = get_YFin_data_online(ticker, trade_date, end_str)
+                    if "No data" not in csv_str and "Error" not in csv_str:
+                        # Strip header lines (lines starting with #)
+                        data_lines = csv_str.split("\n\n", 1)[-1] if "\n\n" in csv_str else csv_str
+                        stock = pd.read_csv(
+                            _io.StringIO(data_lines),
+                            parse_dates=["Date"],
+                            index_col="Date",
+                        )
+                    spy = pd.DataFrame()  # No SPY equivalent for A-shares
+                except Exception:
+                    pass
+
+            if len(stock) < 2:
                 return None, None, None
 
-            actual_days = min(holding_days, len(stock) - 1, len(spy) - 1)
+            actual_days = min(holding_days, len(stock) - 1)
             raw = float(
                 (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
                 / stock["Close"].iloc[0]
             )
-            spy_ret = float(
-                (spy["Close"].iloc[actual_days] - spy["Close"].iloc[0])
-                / spy["Close"].iloc[0]
-            )
-            alpha = raw - spy_ret
+
+            if len(spy) >= 2:
+                spy_ret = float(
+                    (spy["Close"].iloc[actual_days] - spy["Close"].iloc[0])
+                    / spy["Close"].iloc[0]
+                )
+                alpha = raw - spy_ret
+            else:
+                alpha = None  # No benchmark for A-shares
+
             return raw, alpha, actual_days
         except Exception as e:
             logger.warning(
@@ -270,6 +360,10 @@ class TradingAgentsGraph:
         successful node on a subsequent invocation with the same ticker+date.
         """
         self.ticker = company_name
+
+        # Auto-detect A-share / HK tickers and switch data vendor to tencent_sina
+        # when the user hasn't explicitly configured a data vendor for those markets.
+        self._auto_detect_vendor(company_name)
 
         # Resolve any pending memory-log entries for this ticker before the pipeline runs.
         self._resolve_pending_entries(company_name)

@@ -1,4 +1,8 @@
 from typing import Annotated
+import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Import from vendor-specific modules
 from .y_finance import (
@@ -23,6 +27,17 @@ from .alpha_vantage import (
     get_global_news as get_alpha_vantage_global_news,
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
+from .tencent_sina import (
+    get_YFin_data_online as get_tencent_stock,
+    get_stock_stats_indicators_window as get_tencent_indicator,
+    get_fundamentals as get_tencent_fundamentals,
+    get_balance_sheet as get_tencent_balance_sheet,
+    get_cashflow as get_tencent_cashflow,
+    get_income_statement as get_tencent_income_statement,
+    get_insider_transactions as get_tencent_insider_transactions,
+    get_news as get_tencent_news,
+    get_global_news as get_tencent_global_news,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -63,6 +78,7 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "tencent_sina",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -71,41 +87,50 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "tencent_sina": get_tencent_stock,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "tencent_sina": get_tencent_indicator,
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
+        "tencent_sina": get_tencent_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
+        "tencent_sina": get_tencent_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
+        "tencent_sina": get_tencent_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
+        "tencent_sina": get_tencent_income_statement,
     },
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
+        "tencent_sina": get_tencent_news,
     },
     "get_global_news": {
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
+        "tencent_sina": get_tencent_global_news,
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
+        "tencent_sina": get_tencent_insider_transactions,
     },
 }
 
@@ -147,6 +172,7 @@ def route_to_vendor(method: str, *args, **kwargs):
         if vendor not in fallback_vendors:
             fallback_vendors.append(vendor)
 
+    last_error = None
     for vendor in fallback_vendors:
         if vendor not in VENDOR_METHODS[method]:
             continue
@@ -156,7 +182,16 @@ def route_to_vendor(method: str, *args, **kwargs):
 
         try:
             return impl_func(*args, **kwargs)
-        except AlphaVantageRateLimitError:
-            continue  # Only rate limits trigger fallback
+        except Exception as e:
+            last_error = e
+            logger.warning("Vendor '%s' failed for '%s': %s — trying next",
+                           vendor, method, e)
+            time.sleep(1.0)  # brief pause before trying next vendor
+            continue  # Any error triggers fallback to next vendor
 
-    raise RuntimeError(f"No available vendor for '{method}'")
+    # All vendors failed — return a user-friendly message instead of crashing
+    return (
+        f"Error: All data vendors failed for '{method}'. "
+        f"Please check your configuration and try again. "
+        f"(Last error: {type(last_error).__name__}: {last_error})"
+    )

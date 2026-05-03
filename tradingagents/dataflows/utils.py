@@ -13,7 +13,7 @@ SavePathType = Annotated[str, "File path to save data. If None, data is not save
 _TICKER_PATH_RE = re.compile(r"^[A-Za-z0-9._\-\^]+$")
 
 
-def safe_ticker_component(value: str, *, max_len: int = 32) -> str:
+def safe_ticker_component(value, *, max_len: int = 32) -> str:
     """Validate ``value`` is safe to interpolate into a filesystem path.
 
     Tickers come from user CLI input or from LLM tool calls, both of which
@@ -22,10 +22,16 @@ def safe_ticker_component(value: str, *, max_len: int = 32) -> str:
     ``"../../../etc/foo"`` flows into ``os.path.join`` / ``Path /`` and
     escapes the configured cache, checkpoint, or results directory.
 
-    Returns ``value`` unchanged when it matches the allowed pattern; raises
-    ``ValueError`` otherwise.
+    Also accepts integer inputs (e.g. ``600183``) which the LLM may pass
+    for purely-numeric stock codes.
+
+    Returns ``value`` as a string when it matches the allowed pattern;
+    raises ``ValueError`` otherwise.
     """
-    if not isinstance(value, str) or not value:
+    # Coerce non-string inputs (e.g. int from LLM tool calls) to string.
+    if not isinstance(value, str):
+        value = str(value)
+    if not value:
         raise ValueError(f"ticker must be a non-empty string, got {value!r}")
     if len(value) > max_len:
         raise ValueError(f"ticker exceeds {max_len} chars: {value!r}")

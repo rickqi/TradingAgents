@@ -1,5 +1,7 @@
 """yfinance-based news data fetching functions."""
 
+import time
+
 import yfinance as yf
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -152,6 +154,9 @@ def get_global_news_yfinance(
                     if title and title not in seen_titles:
                         seen_titles.add(title)
                         all_news.append(article)
+
+            # Avoid rapid-fire requests to Yahoo Finance
+            time.sleep(1.5)
 
             if len(all_news) >= limit:
                 break

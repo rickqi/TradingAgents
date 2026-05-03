@@ -12,9 +12,23 @@ This module exists for backwards compatibility with callers that expect a
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from tradingagents.agents.utils.rating import parse_rating
+
+
+def _deduplicate_proposals(text: str) -> str:
+    """Remove duplicate FINAL TRANSACTION PROPOSAL blocks from DeepSeek output.
+
+    Some LLM providers (notably DeepSeek) repeat the proposal block multiple
+    times in the response. This keeps only the first occurrence.
+    """
+    pattern = r"(FINAL TRANSACTION PROPOSAL:.*?)(?=FINAL TRANSACTION PROPOSAL:|$)"
+    matches = re.findall(pattern, text, re.DOTALL)
+    if len(matches) > 1:
+        return matches[0].strip()
+    return text
 
 
 class SignalProcessor:
@@ -28,4 +42,5 @@ class SignalProcessor:
 
     def process_signal(self, full_signal: str) -> str:
         """Return one of Buy / Overweight / Hold / Underweight / Sell."""
-        return parse_rating(full_signal)
+        deduped = _deduplicate_proposals(full_signal)
+        return parse_rating(deduped)
