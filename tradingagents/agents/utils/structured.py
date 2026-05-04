@@ -19,6 +19,7 @@ all three agents log the same warnings when fallback fires.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Callable, Optional, TypeVar
 
 from pydantic import BaseModel
@@ -26,6 +27,9 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+# DeepSeek thinking-mode internal tokens that sometimes leak into content.
+_DSML_TOKEN_RE = re.compile(r"<｜[^>]*｜>")
 
 
 def bind_structured(llm: Any, schema: type[T], agent_name: str) -> Optional[Any]:
@@ -70,4 +74,8 @@ def invoke_structured_or_freetext(
             )
 
     response = plain_llm.invoke(prompt)
-    return response.content
+    content = response.content
+    # Strip DeepSeek thinking-mode internal tokens that may leak into output.
+    if isinstance(content, str):
+        content = _DSML_TOKEN_RE.sub("", content).strip()
+    return content

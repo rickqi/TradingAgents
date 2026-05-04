@@ -2,6 +2,7 @@
 
 import logging
 import os
+import sys
 from pathlib import Path
 import json
 from datetime import datetime, timedelta
@@ -37,7 +38,8 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_news,
     get_insider_transactions,
-    get_global_news
+    get_global_news,
+    get_sentiment,
 )
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
@@ -170,6 +172,8 @@ class TradingAgentsGraph:
                 [
                     # News tools for social media analysis
                     get_news,
+                    # Sentiment and mood data (akshare)
+                    get_sentiment,
                 ]
             ),
             "news": ToolNode(
@@ -193,29 +197,34 @@ class TradingAgentsGraph:
 
     @staticmethod
     def _is_chinese_ticker(ticker: str) -> bool:
-        """Return True if ticker looks like an A-share or HK stock code.
+        """Return True if ticker (or any ticker in a comma-separated list) looks like an A-share or HK stock code.
 
         A-share: 6-digit number (600183, 300308, 000001) optionally with
         .SS / .SZ / .SH suffix, or sh/sz prefix.
         HK:      5-digit number with .HK suffix or hk prefix (02149.HK).
+        Handles comma-separated lists and surrounding quotes.
         """
-        t = str(ticker).strip().lower()
-        # Strip known prefixes
-        for prefix in ("sh", "sz", "hk"):
-            if t.startswith(prefix):
-                t = t[len(prefix):]
-                break
-        # Strip exchange suffixes
-        for suffix in (".sz", ".ss", ".sh", ".hk"):
-            if t.endswith(suffix):
-                t = t[: -len(suffix)]
-                break
-        # A-share: 6-digit number
-        if len(t) == 6 and t.isdigit():
-            return True
-        # HK: 4-5 digit number (after stripping .HK)
-        if 4 <= len(t) <= 5 and t.isdigit():
-            return True
+        # Handle comma-separated tickers with optional quotes
+        for part in ticker.split(","):
+            t = str(part).strip().strip('"').strip("'").strip().lower()
+            if not t:
+                continue
+            # Strip known prefixes
+            for prefix in ("sh", "sz", "hk"):
+                if t.startswith(prefix):
+                    t = t[len(prefix):]
+                    break
+            # Strip exchange suffixes
+            for suffix in (".sz", ".ss", ".sh", ".hk"):
+                if t.endswith(suffix):
+                    t = t[: -len(suffix)]
+                    break
+            # A-share: 6-digit number
+            if len(t) == 6 and t.isdigit():
+                return True
+            # HK: 4-5 digit number (after stripping .HK)
+            if 4 <= len(t) <= 5 and t.isdigit():
+                return True
         return False
 
     def _auto_detect_vendor(self, ticker: str):
@@ -228,9 +237,14 @@ class TradingAgentsGraph:
             return
 
         current_vendors = self.config.get("data_vendors", {})
-        # If any category is already explicitly non-yfinance, respect that.
-        non_default = [v for v in current_vendors.values()
-                       if v not in ("yfinance", "default")]
+        # Only check the 4 core categories that default to "yfinance".
+        # "sentiment_data" defaults to "akshare" which would falsely trigger
+        # the early return below.
+        core_categories = ("core_stock_apis", "technical_indicators",
+                           "fundamental_data", "news_data")
+        non_default = [current_vendors.get(k, "yfinance")
+                       for k in core_categories
+                       if current_vendors.get(k, "yfinance") not in ("yfinance", "default")]
         if non_default:
             return
 
@@ -239,8 +253,9 @@ class TradingAgentsGraph:
         self.config["data_vendors"] = {
             "core_stock_apis": ts,
             "technical_indicators": ts,
-            "fundamental_data": ts,
+            "fundamental_data": f"{ts},akshare",
             "news_data": ts,
+            "sentiment_data": "akshare",
         }
         # Propagate to the dataflows config module so route_to_vendor picks it up.
         set_config(self.config)
@@ -421,7 +436,22 @@ class TradingAgentsGraph:
                 if len(chunk["messages"]) == 0:
                     pass
                 else:
-                    chunk["messages"][-1].pretty_print()
+                    try:
+                        chunk["messages"][-1].pretty_print()
+                    except UnicodeEncodeError:
+                        # Windows GBK console can't encode emoji characters
+                        # that LLM may include in responses — print safely
+                        msg = chunk["messages"][-1]
+                        text = getattr(msg, "content", str(msg))
+                        if isinstance(text, list):
+                            text = " ".join(
+                                t.get("text", "") if isinstance(t, dict) else str(t)
+                                for t in text
+                            )
+                        safe = str(text).encode(
+                            sys.stdout.encoding or "utf-8", errors="replace"
+                        ).decode(sys.stdout.encoding or "utf-8", errors="replace")
+                        print(safe[:500])
                     trace.append(chunk)
             final_state = trace[-1]
         else:

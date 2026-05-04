@@ -38,6 +38,18 @@ from .tencent_sina import (
     get_news as get_tencent_news,
     get_global_news as get_tencent_global_news,
 )
+from .akshare_vendor import (
+    get_YFin_data_online as get_akshare_stock,
+    get_stock_stats_indicators_window as get_akshare_indicator,
+    get_fundamentals as get_akshare_fundamentals,
+    get_balance_sheet as get_akshare_balance_sheet,
+    get_cashflow as get_akshare_cashflow,
+    get_income_statement as get_akshare_income_statement,
+    get_insider_transactions as get_akshare_insider_transactions,
+    get_sentiment as get_akshare_sentiment,
+    get_news as get_akshare_news,
+    get_global_news as get_akshare_global_news,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -72,6 +84,12 @@ TOOLS_CATEGORIES = {
             "get_global_news",
             "get_insider_transactions",
         ]
+    },
+    "sentiment_data": {
+        "description": "Market sentiment and social data",
+        "tools": [
+            "get_sentiment",
+        ]
     }
 }
 
@@ -79,6 +97,7 @@ VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
     "tencent_sina",
+    "akshare",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -88,33 +107,39 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
         "tencent_sina": get_tencent_stock,
+        "akshare": get_akshare_stock,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
         "tencent_sina": get_tencent_indicator,
+        "akshare": get_akshare_indicator,
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
         "tencent_sina": get_tencent_fundamentals,
+        "akshare": get_akshare_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
         "tencent_sina": get_tencent_balance_sheet,
+        "akshare": get_akshare_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
         "tencent_sina": get_tencent_cashflow,
+        "akshare": get_akshare_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
         "tencent_sina": get_tencent_income_statement,
+        "akshare": get_akshare_income_statement,
     },
     # news_data
     "get_news": {
@@ -131,6 +156,11 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
         "tencent_sina": get_tencent_insider_transactions,
+        "akshare": get_akshare_insider_transactions,
+    },
+    # sentiment_data
+    "get_sentiment": {
+        "akshare": get_akshare_sentiment,
     },
 }
 
@@ -165,11 +195,24 @@ def route_to_vendor(method: str, *args, **kwargs):
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")
 
-    # Build fallback chain: primary vendors first, then remaining available vendors
+    # Build fallback chain: primary vendors first, then remaining available vendors.
+    # When primary includes Chinese-market vendors (tencent_sina / akshare),
+    # exclude yfinance from BOTH primary and fallback — it has no useful
+    # A-share data and its rate-limiting burns minutes of wall-clock time.
+    _CHINESE_VENDORS = {"tencent_sina", "akshare"}
+    _SKIP_FOR_CHINESE = {"yfinance", "alpha_vantage"}
+    is_chinese_mode = any(v in _CHINESE_VENDORS for v in primary_vendors)
+
     all_available_vendors = list(VENDOR_METHODS[method].keys())
-    fallback_vendors = primary_vendors.copy()
+    fallback_vendors = []
+    for vendor in primary_vendors:
+        if is_chinese_mode and vendor in _SKIP_FOR_CHINESE:
+            continue
+        fallback_vendors.append(vendor)
     for vendor in all_available_vendors:
         if vendor not in fallback_vendors:
+            if is_chinese_mode and vendor in _SKIP_FOR_CHINESE:
+                continue
             fallback_vendors.append(vendor)
 
     last_error = None
@@ -186,7 +229,10 @@ def route_to_vendor(method: str, *args, **kwargs):
             last_error = e
             logger.warning("Vendor '%s' failed for '%s': %s — trying next",
                            vendor, method, e)
-            time.sleep(1.0)  # brief pause before trying next vendor
+            # Brief pause before trying next vendor; yfinance rate limits
+            # need a longer cooldown before the next vendor attempt.
+            cooldown = 2.0 if "Rate" in str(e) or "rate" in str(e) else 1.0
+            time.sleep(cooldown)
             continue  # Any error triggers fallback to next vendor
 
     # All vendors failed — return a user-friendly message instead of crashing

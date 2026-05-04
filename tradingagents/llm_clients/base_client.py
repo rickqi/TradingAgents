@@ -1,6 +1,16 @@
+import re
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 import warnings
+
+# DeepSeek thinking-mode internal tokens that sometimes leak into content.
+# Matches patterns like <｜DSML｜>, <｜DSML｜｜tool_calls>, <｜end▁of▁thinking｜>, etc.
+_DSML_TOKEN_RE = re.compile(r"<｜[^>]*｜>")
+
+
+def _strip_dsml_tokens(text: str) -> str:
+    """Remove DeepSeek internal thinking tokens from text."""
+    return _DSML_TOKEN_RE.sub("", text).strip()
 
 
 def normalize_content(response):
@@ -18,7 +28,9 @@ def normalize_content(response):
             else item if isinstance(item, str) else ""
             for item in content
         ]
-        response.content = "\n".join(t for t in texts if t)
+        response.content = _strip_dsml_tokens("\n".join(t for t in texts if t))
+    elif isinstance(content, str):
+        response.content = _strip_dsml_tokens(content)
     return response
 
 

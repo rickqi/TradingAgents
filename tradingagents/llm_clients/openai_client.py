@@ -60,11 +60,24 @@ class DeepSeekChatOpenAI(NormalizedChatOpenAI):
        fails with HTTP 400. ``_create_chat_result`` captures the field on
        receive and ``_get_request_payload`` re-attaches it on send.
 
-    2. **deepseek-reasoner has no tool_choice.** Structured output via
-       function-calling is unavailable, so we raise NotImplementedError
-       and let the agent factories fall back to free-text generation
-       (see ``tradingagents/agents/utils/structured.py``).
+    2. **Thinking models do not support tool_choice.** DeepSeek V4 models
+       (``deepseek-v4-pro``, ``deepseek-v4-flash``) default to thinking
+       mode which supports tool calls but NOT the ``tool_choice`` parameter.
+       ``bind_tools`` strips ``tool_choice`` for these models so structured
+       output via ``with_structured_output`` works without the forced-call
+       constraint. The legacy ``deepseek-reasoner`` (retires 2026-07-24)
+       raises ``NotImplementedError`` entirely and agent factories fall back
+       to free-text generation.
     """
+
+    # Legacy model names that do NOT support tool_choice / structured output
+    # at all — agent factories fall back to free-text.
+    _NO_TOOL_CHOICE_MODELS = frozenset({"deepseek-reasoner"})
+
+    # Thinking-capable V4 models — support tool calls but NOT tool_choice
+    # when thinking mode is active (the default). bind_tools strips
+    # tool_choice so with_structured_output works via unforced tool calls.
+    _THINKING_MODELS = frozenset({"deepseek-v4-pro", "deepseek-v4-flash"})
 
     def _get_request_payload(self, input_, *, stop=None, **kwargs):
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
@@ -94,10 +107,21 @@ class DeepSeekChatOpenAI(NormalizedChatOpenAI):
                 generation.message.additional_kwargs["reasoning_content"] = reasoning
         return chat_result
 
+    def bind_tools(self, tools, *, tool_choice=None, **kwargs):
+        """Bind tools without ``tool_choice`` for thinking models.
+
+        DeepSeek V4 thinking mode supports tool calls but rejects the
+        ``tool_choice`` parameter. Stripping it lets the model see and use
+        the tools naturally while avoiding HTTP 400 errors.
+        """
+        if self.model_name in self._THINKING_MODELS and tool_choice is not None:
+            tool_choice = None
+        return super().bind_tools(tools, tool_choice=tool_choice, **kwargs)
+
     def with_structured_output(self, schema, *, method=None, **kwargs):
-        if self.model_name == "deepseek-reasoner":
+        if self.model_name in self._NO_TOOL_CHOICE_MODELS:
             raise NotImplementedError(
-                "deepseek-reasoner does not support tool_choice; structured "
+                f"{self.model_name} does not support tool_choice; structured "
                 "output is unavailable. Agent factories fall back to "
                 "free-text generation automatically."
             )

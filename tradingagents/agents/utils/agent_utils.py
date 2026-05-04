@@ -18,6 +18,9 @@ from tradingagents.agents.utils.news_data_tools import (
     get_insider_transactions,
     get_global_news
 )
+from tradingagents.agents.utils.sentiment_tools import (
+    get_sentiment,
+)
 
 
 def get_language_instruction() -> str:
@@ -38,8 +41,12 @@ def build_instrument_context(ticker: str) -> str:
     """Describe the exact instrument so agents preserve exchange-qualified tickers."""
     return (
         f"The instrument to analyze is `{ticker}`. "
-        "Use this exact ticker in every tool call, report, and recommendation, "
-        "preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`)."
+        "CRITICAL: Use this exact ticker string as the first argument in EVERY tool call "
+        "(get_news, get_fundamentals, get_stock_data, etc.). "
+        "Never substitute the ticker with a company name, industry keyword, concept, "
+        "or any translated text. For example, if the ticker is `002876.SZ`, you MUST "
+        "call get_news(`002876.SZ`, ...) — NOT get_news('偏光片', ...) or get_news('polarizer', ...). "
+        "Preserving any exchange suffix (e.g. `.SZ`, `.SH`, `.TO`, `.HK`)."
     )
 
 def create_msg_delete():

@@ -9,16 +9,13 @@ Usage:
     python scripts/turnover_screener.py              # screen only
     python scripts/turnover_screener.py --analyze 5   # screen + analyze top 5
 """
-import sys
-import io
-import json
 import time
 import argparse
-from pathlib import Path
-from datetime import datetime
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+from _share_config import (
+    build_ashare_config, init_trading_agents,
+    save_results, load_results, completed_tickers,
+)
 
 import requests
 import pandas as pd
@@ -167,37 +164,36 @@ def rank_candidates(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
 # Step 4: Run TradingAgents analysis on selected candidates
 # ---------------------------------------------------------------------------
 
-def run_analysis(candidates: pd.DataFrame, date: str = "2026-04-30"):
-    """Run TradingAgents deep analysis on each candidate."""
-    from dotenv import load_dotenv
-    load_dotenv()
+def run_analysis(candidates: pd.DataFrame, date: str = "2026-04-30",
+                 start_from: int = 0, results_path: str = "turnover_analysis_results.json"):
+    """Run TradingAgents deep analysis on each candidate.
 
-    from tradingagents.graph.trading_graph import TradingAgentsGraph
-    from tradingagents.default_config import DEFAULT_CONFIG
-
-    config = DEFAULT_CONFIG.copy()
-    config["llm_provider"] = "deepseek"
-    config["deep_think_llm"] = "deepseek-chat"
-    config["quick_think_llm"] = "deepseek-chat"
-    config["data_vendors"] = {
-        "core_stock_apis": "tencent_sina",
-        "technical_indicators": "tencent_sina",
-        "fundamental_data": "tencent_sina",
-        "news_data": "tencent_sina",
-    }
-    config["max_debate_rounds"] = 1
-    config["max_risk_discuss_rounds"] = 1
-    config["output_language"] = "Chinese"
+    Args:
+        start_from: Skip the first N candidates (0-based index). Useful for
+                     resuming after a crash or timeout.
+        results_path: Path for incremental JSON results dump.
+    """
+    config = build_ashare_config()
+    results = load_results(results_path)
+    done = completed_tickers(results)
 
     print("\nInitializing TradingAgentsGraph...")
-    ta = TradingAgentsGraph(debug=False, config=config)
+    ta = init_trading_agents(config, debug=False)
 
-    results = []
-    for _, row in candidates.iterrows():
+    for idx, (_, row) in enumerate(candidates.iterrows()):
+        if idx < start_from:
+            continue
         ticker = row["ticker"]
         name = row["name"]
+
+        # Skip already-completed stocks
+        if ticker in done:
+            print(f"\n>>> Skipping {name} ({ticker}) — already done")
+            continue
+
         print(f"\n{'='*60}")
-        print(f"Analyzing {name} ({ticker}) | Price: {row['price']:.2f} | Turnover: {row['turnover_pct']:.1f}%")
+        print(f"[{idx+1}/{len(candidates)}] Analyzing {name} ({ticker}) | "
+              f"Price: {row['price']:.2f} | Turnover: {row['turnover_pct']:.1f}%")
         print(f"{'='*60}")
         start = time.time()
         try:
@@ -218,6 +214,10 @@ def run_analysis(candidates: pd.DataFrame, date: str = "2026-04-30"):
             })
             print(f"\n>>> {name} ({ticker}): ERROR - {e} [{elapsed:.0f}s]")
 
+        # Incremental save after each stock
+        save_results(results, results_path)
+        print(f"  (Results saved to {results_path}, {len(results)} total)")
+
     return results
 
 
@@ -230,6 +230,8 @@ def main():
     parser.add_argument("--analyze", type=int, default=0, help="Number of top candidates to run deep analysis on (0=screen only)")
     parser.add_argument("--date", type=str, default="2026-04-30", help="Analysis date (YYYY-MM-DD)")
     parser.add_argument("--top", type=int, default=50, help="Number of top turnover stocks to fetch")
+    parser.add_argument("--start-from", type=int, default=0, help="Skip first N candidates (0-based, for resuming)")
+    parser.add_argument("--results-file", type=str, default="turnover_analysis_results.json", help="Path to save/load results JSON")
     args = parser.parse_args()
 
     # Step 1: Fetch top turnover stocks
@@ -286,7 +288,7 @@ def main():
         print(f"Running TradingAgents deep analysis on top {args.analyze} candidates...")
         print("=" * 80)
 
-        results = run_analysis(candidates, date=args.date)
+        results = run_analysis(candidates, date=args.date, start_from=args.start_from, results_path=args.results_file)
 
         # Summary
         print(f"\n\n{'=' * 80}")
@@ -298,9 +300,8 @@ def main():
             print(f"{r['name']:<12} {r['ticker']:<12} {r['price']:>7.2f} {r['turnover']:>8.1f}% {r['decision']:<10} {r['time']:>5.0f}s")
 
         # Save results
-        with open("turnover_analysis_results.json", "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
-        print(f"\nResults saved to turnover_analysis_results.json")
+        save_results(results, args.results_file)
+        print(f"\nResults saved to {args.results_file}")
 
 
 if __name__ == "__main__":

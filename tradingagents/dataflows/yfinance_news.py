@@ -123,10 +123,9 @@ def get_global_news_yfinance(
         Formatted string containing global news articles
     """
     # Search queries for macro/global news
+    # Reduced to 2 queries to minimize Yahoo Finance API pressure during batch analysis
     search_queries = [
         "stock market economy",
-        "Federal Reserve interest rates",
-        "inflation economic outlook",
         "global markets trading",
     ]
 
@@ -155,8 +154,8 @@ def get_global_news_yfinance(
                         seen_titles.add(title)
                         all_news.append(article)
 
-            # Avoid rapid-fire requests to Yahoo Finance
-            time.sleep(1.5)
+            # Avoid rapid-fire requests to Yahoo Finance (increased for batch stability)
+            time.sleep(3.0)
 
             if len(all_news) >= limit:
                 break

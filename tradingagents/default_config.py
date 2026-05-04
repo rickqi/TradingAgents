@@ -37,11 +37,14 @@ DEFAULT_CONFIG = {
     "max_recur_limit": 250,
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
+    # Options per category: yfinance, alpha_vantage, tencent_sina, akshare
+    # Comma-separated = fallback chain (first success wins)
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "core_stock_apis": "yfinance",
+        "technical_indicators": "yfinance",
+        "fundamental_data": "yfinance",
+        "news_data": "yfinance",
+        "sentiment_data": "akshare",              # akshare only (stock_comment_em)
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {

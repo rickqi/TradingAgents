@@ -81,9 +81,10 @@ def select_analysts() -> List[AnalystType]:
     choices = questionary.checkbox(
         "Select Your [Analysts Team]:",
         choices=[
-            questionary.Choice(display, value=value) for display, value in ANALYST_ORDER
+            questionary.Choice(display, value=value, checked=True)
+            for display, value in ANALYST_ORDER
         ],
-        instruction="\n- Press Space to select/unselect analysts\n- Press 'a' to select/unselect all\n- Press Enter when done",
+        instruction="\n- Press Space to select/unselect analysts\n- Press 'a' to select/unselect all\n- Press Enter when done\n- All analysts are selected by default",
         validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
         style=questionary.Style(
             [

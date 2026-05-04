@@ -13,12 +13,16 @@ from .utils import safe_ticker_component
 logger = logging.getLogger(__name__)
 
 
-def yf_retry(func, max_retries=3, base_delay=2.0):
+def yf_retry(func, max_retries=5, base_delay=4.0):
     """Execute a yfinance call with exponential backoff on rate limits.
 
     yfinance raises YFRateLimitError on HTTP 429 responses but does not
     retry them internally. This wrapper adds retry logic specifically
     for rate limits. Other exceptions propagate immediately.
+
+    For batch analysis scenarios (10+ stocks), Yahoo Finance enforces
+    strict rate limits. The generous defaults (5 retries, 4s base delay)
+    give up to ~2 minutes of backoff before giving up.
     """
     for attempt in range(max_retries + 1):
         try:

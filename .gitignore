@@ -217,3 +217,8 @@ __marimo__/
 
 # Cache
 **/data_cache/
+
+# Analysis outputs (regenerated from scripts)
+turnover_screen_results.csv
+turnover_analysis_results.json
+reports/

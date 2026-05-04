@@ -971,6 +971,31 @@ def format_tool_args(args, max_length=80) -> str:
         return result[:max_length - 3] + "..."
     return result
 
+def _is_ashare_ticker(ticker: str) -> bool:
+    """Detect if a ticker (or comma-separated list of tickers) contains A-share symbols.
+
+    Matches patterns like: 002876.SZ, 600519.SH, 300308.SZ, 603208.SH
+    Also matches bare 6-digit numeric codes (assumed A-share).
+    Handles comma-separated ticker lists (e.g. "002876.SZ,000062.SZ").
+    Returns True if ANY of the tickers is an A-share symbol.
+    """
+    # Handle comma-separated tickers; strip surrounding quotes from each token
+    tickers = [t.strip().strip('"').strip("'") for t in ticker.split(",")]
+    for tick in tickers:
+        t = tick.strip().upper()
+        if not t:
+            continue
+        # With exchange suffix
+        if t.endswith((".SZ", ".SH", ".SS")):
+            code = t.rsplit(".", 1)[0]
+            if code.isdigit() and len(code) == 6:
+                return True
+        # Bare numeric code (e.g. "600519")
+        elif t.isdigit() and len(t) == 6:
+            return True
+    return False
+
+
 def run_analysis(checkpoint: bool = False):
     # First get all user selections
     selections = get_user_selections()
@@ -989,6 +1014,24 @@ def run_analysis(checkpoint: bool = False):
     config["anthropic_effort"] = selections.get("anthropic_effort")
     config["output_language"] = selections.get("output_language", "English")
     config["checkpoint_enabled"] = checkpoint
+
+    # Auto-detect A-share tickers and switch to Chinese data sources
+    ticker_value = selections["ticker"]
+    is_ashare = _is_ashare_ticker(ticker_value)
+    console.print(f"[dim]Ticker input: {repr(ticker_value)}[/dim]")
+    console.print(f"[dim]A-share detected: {is_ashare}[/dim]")
+    if is_ashare:
+        config["data_vendors"] = {
+            "core_stock_apis": "tencent_sina",
+            "technical_indicators": "tencent_sina",
+            "fundamental_data": "tencent_sina,akshare",
+            "news_data": "tencent_sina",
+            "sentiment_data": "akshare",
+        }
+        console.print(
+            "[dim]Detected A-share ticker — using tencent_sina (Tencent/Sina/EastMoney) "
+            "as primary data source, akshare for fundamentals & sentiment.[/dim]"
+        )
 
     # Create stats callback handler for tracking LLM/tool calls
     stats_handler = StatsCallbackHandler()
@@ -1011,8 +1054,17 @@ def run_analysis(checkpoint: bool = False):
     # Track start time for elapsed display
     start_time = time.time()
 
-    # Create result directory
-    results_dir = Path(config["results_dir"]) / selections["ticker"] / selections["analysis_date"]
+    # Create result directory — sanitize ticker so characters like '/' don't
+    # create unintended sub-directories (e.g. "601318.SH/02318.HK").
+    from tradingagents.dataflows.utils import safe_ticker_component
+    safe_ticker = selections["ticker"].replace("/", "_").replace("\\", "_")
+    try:
+        safe_ticker = safe_ticker_component(safe_ticker)
+    except ValueError:
+        # Fallback: slugify anything non-safe to underscore
+        safe_ticker = re.sub(r"[^A-Za-z0-9._\-\^]", "_", selections["ticker"])
+
+    results_dir = Path(config["results_dir"]) / safe_ticker / selections["analysis_date"]
     results_dir.mkdir(parents=True, exist_ok=True)
     report_dir = results_dir / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -1095,6 +1147,11 @@ def run_analysis(checkpoint: bool = False):
         graph._auto_detect_vendor(selections["ticker"])
         graph._resolve_pending_entries(selections["ticker"])
 
+        # Diagnostic: show active data vendor config
+        from tradingagents.dataflows.config import get_config as get_df_config
+        active_vendors = get_df_config().get("data_vendors", {})
+        console.print(f"[dim]Active data_vendors: {active_vendors}[/dim]")
+
         init_agent_state = graph.propagator.create_initial_state(
             selections["ticker"], selections["analysis_date"]
         )
@@ -1104,7 +1161,8 @@ def run_analysis(checkpoint: bool = False):
 
         # Stream the analysis
         trace = []
-        for chunk in graph.graph.stream(init_agent_state, **args):
+        try:
+          for chunk in graph.graph.stream(init_agent_state, **args):
             # Process all messages in chunk, deduplicating by message ID
             for message in chunk.get("messages", []):
                 msg_id = getattr(message, "id", None)
@@ -1203,7 +1261,19 @@ def run_analysis(checkpoint: bool = False):
 
             trace.append(chunk)
 
+        except Exception as e:
+            console.print(f"\n[bold red]Graph execution failed: {e}[/bold red]")
+            import traceback
+            traceback.print_exc()
+            if not trace:
+                console.print("[red]No chunks were processed — the graph failed at startup.[/red]")
+                return
+            console.print(f"[yellow]Partial results: {len(trace)} chunks were processed before failure.[/yellow]")
+
         # Get final state and decision
+        if not trace:
+            console.print("[red]No results to process.[/red]")
+            return
         final_state = trace[-1]
         decision = graph.process_signal(final_state["final_trade_decision"])
 
@@ -1239,7 +1309,7 @@ def run_analysis(checkpoint: bool = False):
     save_choice = typer.prompt("Save report?", default="Y").strip().upper()
     if save_choice in ("Y", "YES", ""):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_path = Path.cwd() / "reports" / f"{selections['ticker']}_{timestamp}"
+        default_path = Path.cwd() / "reports" / f"{safe_ticker}_{timestamp}"
         save_path_str = typer.prompt(
             "Save path (press Enter for default)",
             default=str(default_path)

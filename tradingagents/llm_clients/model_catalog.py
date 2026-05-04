@@ -66,13 +66,13 @@ MODEL_OPTIONS: ProviderModeOptions = {
     "deepseek": {
         "quick": [
             ("DeepSeek V4 Flash - Latest V4 fast model", "deepseek-v4-flash"),
-            ("DeepSeek V3.2", "deepseek-chat"),
+            ("DeepSeek V3.2 (legacy, retires 2026-07)", "deepseek-chat"),
             ("Custom model ID", "custom"),
         ],
         "deep": [
-            ("DeepSeek V4 Pro - Latest V4 flagship model", "deepseek-v4-pro"),
-            ("DeepSeek V3.2 (thinking)", "deepseek-reasoner"),
-            ("DeepSeek V3.2", "deepseek-chat"),
+            ("DeepSeek V4 Pro - Flagship, thinking mode", "deepseek-v4-pro"),
+            ("DeepSeek V4 Flash - Fast, thinking mode", "deepseek-v4-flash"),
+            ("DeepSeek V3.2 (legacy, retires 2026-07)", "deepseek-chat"),
             ("Custom model ID", "custom"),
         ],
     },
