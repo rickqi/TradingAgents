@@ -1,6 +1,6 @@
 # OpenCLI 财经命令速查手册
 
-> 版本: opencli v1.7.8+ | 更新: 2026-05-04 | 适用场景: 量化交易数据采集、市场监控、财经研究
+> 版本: opencli v1.7.8+ | 更新: 2026-05-05 | 适用场景: 量化交易数据采集、市场监控、财经研究
 
 ---
 
@@ -72,11 +72,12 @@
 
 ```
 分析今日龙虎榜:
-1. `opencli eastmoney longhu -f json` 获取龙虎榜明细
-2. 识别机构专用席位买入的个股
-3. 识别游资席位活跃的个股
-4. 对龙虎榜个股查询K线: `opencli eastmoney kline <code> -f json`
-5. 结合 `opencli eastmoney money-flow` 确认资金是否持续流入
+1. `opencli eastmoney longhu -f json` 获取全部龙虎榜明细
+2. 或按个股过滤: `opencli eastmoney longhu` (TradingAgents 内置 symbol 参数过滤)
+3. 识别机构专用席位买入的个股
+4. 识别游资席位活跃的个股
+5. 对龙虎榜个股查询K线: `opencli eastmoney kline <code> -f json`
+6. 结合 `opencli eastmoney money-flow` 确认资金是否持续流入
 ```
 
 ### 2.6 加密货币监控
@@ -124,22 +125,32 @@
 
 ### 2.10 TradingAgents 集成
 
-```
-将 opencli 数据接入 TradingAgents 框架:
-1. 使用 opencli 获取候选股票池:
-   - `opencli eastmoney rank --limit 30 -f json` 涨幅排行
-   - `opencli eastmoney money-flow --limit 20 -f json` 资金流排行
-2. 筛选出同时出现在两个榜单的股票代码
-3. 将筛选出的代码传入 TradingAgents:
-   ```
-   python scripts/run_a_share.py <CODE> <DATE>
-   ```
-4. 或使用 Python API:
-   ```python
-   from tradingagents.graph.trading_graph import TradingAgentsGraph
-   ta = TradingAgentsGraph(config=config)
-   _, decision = ta.propagate("<CODE>", "<DATE>")
-   ```
+TradingAgents 已内置 11 个 OpenCLI 工具,自动在 A-share 分析时激活:
+
+| 工具函数 | CLI 命令 | 绑定 Agent | 数据内容 |
+|---|---|---|---|
+| `get_quote` | `eastmoney quote` | Market Analyst | 实时行情(PE/PB/市值/换手率等16项) |
+| `get_kline` | `eastmoney kline` | Market Analyst | K线历史(日/周/月/分钟+复权) |
+| `get_money_flow` | `eastmoney money-flow` | Market Analyst | 主力资金净流入排行 |
+| `get_northbound` | `eastmoney northbound` | Market Analyst | 沪深港通北向/南向资金 |
+| `get_sectors` | `eastmoney sectors` | Market Analyst | 板块排行(行业/概念/地域) |
+| `get_longhu` | `eastmoney longhu` | Market Analyst | 龙虎榜明细(支持个股过滤) |
+| `get_hot_rank` | `tdx hot-rank` | Market Analyst | 人气热搜排行 |
+| `get_index_board` | `eastmoney index-board` | Market Analyst | 主要市场指数行情 |
+| `get_kuaixun` | `eastmoney kuaixun` | Market + News | 7×24财经快讯 |
+| `get_holders` | `eastmoney holders` | Fundamentals Analyst | 十大流通股东 |
+| `get_announcement` | `eastmoney announcement` | News Analyst | 上市公司公告 |
+
+**触发条件**: 输入 A-share 代码(如 `000858.SZ`, `600519`)时自动激活,无需手动配置。
+**降级策略**: 未安装 opencli 时所有工具静默跳过,不影响分析流程。
+
+```bash
+# 安装 opencli 后直接使用:
+tradingagents    # 输入 A-share 代码即可
+python -m cli.main
+
+# 或使用 Python API:
+python scripts/run_a_share.py 000858 2026-05-05
 ```
 
 ---
