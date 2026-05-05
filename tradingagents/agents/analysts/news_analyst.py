@@ -1,3 +1,4 @@
+import shutil
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
@@ -6,6 +7,16 @@ from tradingagents.agents.utils.agent_utils import (
     get_news,
 )
 from tradingagents.dataflows.config import get_config
+
+
+def _is_chinese_ticker(ticker: str) -> bool:
+    """Return True if ticker looks like an A-share or HK stock code."""
+    t = str(ticker).strip().lower()
+    for suffix in (".sz", ".sh", ".ss", ".hk"):
+        if t.endswith(suffix):
+            t = t[:-len(suffix)]
+            break
+    return t.isdigit() and 4 <= len(t) <= 6
 
 
 def create_news_analyst(llm):
@@ -18,10 +29,20 @@ def create_news_analyst(llm):
             get_global_news,
         ]
 
+        # Add OpenCLI tools for A-share tickers
+        if shutil.which("opencli") and _is_chinese_ticker(state["company_of_interest"]):
+            from tradingagents.agents.utils.opencli_tools import get_announcement, get_kuaixun
+            tools.extend([get_announcement, get_kuaixun])
+
+        opencli_guidance = ""
+        if shutil.which("opencli") and _is_chinese_ticker(state["company_of_interest"]):
+            opencli_guidance = " When analyzing A-share stocks, you may also use `get_announcement(market, limit)` for official company announcements and `get_kuaixun(column, limit)` for real-time financial news flashes."
+
         system_message = (
             "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(ticker, start_date, end_date) for company-specific news (you MUST pass the exact ticker symbol as the first argument, never a company name or industry keyword), and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
-            + get_language_instruction()
+        + opencli_guidance
+        + get_language_instruction(),
         )
 
         prompt = ChatPromptTemplate.from_messages(

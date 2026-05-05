@@ -48,9 +48,16 @@ def _build_market_tools(include_opencli: bool = True):
                 get_northbound,
                 get_longhu,
                 get_hot_rank,
+                get_quote,
+                get_kline,
+                get_index_board,
+                get_kuaixun,
             )
-            tools.extend([get_money_flow, get_sectors, get_northbound, get_longhu, get_hot_rank])
-            logger.info("OpenCLI detected — added 5 extended market data tools to Market Analyst")
+            tools.extend([
+                get_money_flow, get_sectors, get_northbound, get_longhu, get_hot_rank,
+                get_quote, get_kline, get_index_board, get_kuaixun,
+            ])
+            logger.info("OpenCLI detected — added 9 extended market data tools to Market Analyst")
         except ImportError:
             pass
 
@@ -84,8 +91,12 @@ def create_market_analyst(llm):
 - `get_money_flow(symbol, limit)`: Main force capital flow (主力资金净流入) — shows institutional smart money inflows/outflows. Use this to understand if large players are accumulating or distributing.
 - `get_northbound(market)`: Northbound capital flow (北向资金) via Shanghai/Shenzhen Connect — shows foreign investor sentiment toward A-shares. Use "sh" for Shanghai or "sz" for Shenzhen.
 - `get_sectors(sector_type, limit)`: Sector rankings (板块排行) — shows which industry/concept/area sectors are leading. Use to understand sector rotation and thematic trends.
-- `get_longhu()`: Dragon-Tiger list (龙虎榜) — shows stocks with unusual institutional trading activity. Important for detecting seat-level institutional interest.
+- `get_longhu(symbol)`: Dragon-Tiger list (龙虎榜) — shows stocks with unusual institutional trading activity. Important for detecting seat-level institutional interest. Optionally filter by stock symbol.
 - `get_hot_rank(limit)`: Hot stock rankings (人气排行) — shows most searched/watched stocks by retail investors.
+- `get_quote(symbols)`: Real-time stock quotes (实时行情) with 16 metrics including PE, PB, market cap, turnover rate. Use this FIRST to get current valuation context before deeper analysis.
+- `get_kline(symbol, period, adjust, limit)`: K-line historical data (K线) with configurable period (day/week/month/intraday) and price adjustment. Use for pattern analysis and trend confirmation.
+- `get_index_board(group)`: Major market index board (指数行情) showing CSI 300, SSE 50, etc. Use to understand overall market direction.
+- `get_kuaixun(column, limit)`: 7x24 financial news flashes (财经快讯). Use for real-time market-moving events that may affect intraday analysis.
 
 When analyzing A-share stocks, consider using these tools AFTER getting stock data and indicators to enrich your report with capital flow and sector context. Call them if they would add meaningful insight to your analysis. Do NOT call all of them unconditionally — only call the ones relevant to the stock being analyzed."""
 

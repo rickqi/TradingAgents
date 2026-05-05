@@ -224,7 +224,9 @@ def get_sectors(
     return _format_data_table(data, "Sector Rankings (板块排行)")
 
 
-def get_longhu() -> str:
+def get_longhu(
+    symbol: Annotated[str, "optional stock symbol filter (empty for all)"] = "",
+) -> str:
     """龙虎榜明细 (eastmoney longhu). Public API."""
     if _get_opencli_path() is None:
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
@@ -240,6 +242,15 @@ def get_longhu() -> str:
 
     if not data:
         return "# Dragon-Tiger List (龙虎榜)\nNo data available."
+
+    if symbol:
+        data = [
+            row for row in data
+            if str(row.get("code", "")) == symbol
+            or str(row.get("code", "")).zfill(6) == symbol.zfill(6)
+        ]
+        if not data:
+            return f"# Dragon-Tiger List (龙虎榜)\nNo data found for symbol {symbol}."
 
     return _format_data_table(data, "Dragon-Tiger List (龙虎榜)")
 
@@ -266,6 +277,176 @@ def get_hot_rank(
         return "# Hot Stock Rankings (人气热搜排行)\nNo data available."
 
     return _format_data_table(data, "Hot Stock Rankings (人气热搜排行)")
+
+
+def get_quote(
+    symbols: Annotated[str, "stock symbols, comma-separated (e.g. '600519,000858')"] = "",
+) -> str:
+    """个股实时行情 (eastmoney quote). Public API.
+    Returns 16 fields: price, changePercent, PE, PB, marketCap, turnoverRate, etc."""
+    if _get_opencli_path() is None:
+        return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
+
+    args = [symbols] if symbols else []
+
+    try:
+        data = _run_opencli("eastmoney", "quote", args, timeout=15)
+    except FileNotFoundError:
+        return "Error: opencli not found in PATH."
+    except subprocess.TimeoutExpired:
+        return "Error: opencli eastmoney quote timed out."
+    except (json.JSONDecodeError, RuntimeError) as exc:
+        return f"Error fetching quote data: {exc}"
+
+    if not data:
+        return "# Real-Time Stock Quotes (个股实时行情)\nNo data available."
+
+    return _format_data_table(data, "Real-Time Stock Quotes (个股实时行情)")
+
+
+def get_kline(
+    symbol: Annotated[str, "stock symbol (e.g. 600519)"] = "600519",
+    period: Annotated[str, "K-line period: day, week, month, 5m, 15m, 30m, 60m"] = "day",
+    adjust: Annotated[str, "adjustment: none, forward, backward"] = "forward",
+    limit: Annotated[int, "number of K-line bars to return"] = 30,
+) -> str:
+    """K线历史数据 (eastmoney kline). Public API.
+    Returns OHLCV + amplitude + changePercent + turnoverRate."""
+    if _get_opencli_path() is None:
+        return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
+
+    args = [
+        symbol,
+        "--period", period,
+        "--adjust", adjust,
+        "--limit", str(limit),
+    ]
+
+    try:
+        data = _run_opencli("eastmoney", "kline", args, timeout=15)
+    except FileNotFoundError:
+        return "Error: opencli not found in PATH."
+    except subprocess.TimeoutExpired:
+        return "Error: opencli eastmoney kline timed out."
+    except (json.JSONDecodeError, RuntimeError) as exc:
+        return f"Error fetching kline data: {exc}"
+
+    if not data:
+        return f"# K-Line Data ({symbol} {period})\nNo data available."
+
+    return _format_data_table(data, f"K-Line Data ({symbol} {period})")
+
+
+def get_holders(
+    symbol: Annotated[str, "A-share stock code (e.g. 600519)"] = "600519",
+    limit: Annotated[int, "number of top holders to return"] = 10,
+) -> str:
+    """十大流通股东 (eastmoney holders). Public API.
+    Returns rank, reportDate, name, holdNum, floatRatio, change."""
+    if _get_opencli_path() is None:
+        return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
+
+    args = [
+        symbol,
+        "--limit", str(limit),
+    ]
+
+    try:
+        data = _run_opencli("eastmoney", "holders", args, timeout=15)
+    except FileNotFoundError:
+        return "Error: opencli not found in PATH."
+    except subprocess.TimeoutExpired:
+        return "Error: opencli eastmoney holders timed out."
+    except (json.JSONDecodeError, RuntimeError) as exc:
+        return f"Error fetching holders data: {exc}"
+
+    if not data:
+        return f"# Top 10 Holders (十大流通股东 - {symbol})\nNo data available."
+
+    return _format_data_table(data, f"Top 10 Holders (十大流通股东 - {symbol})")
+
+
+def get_announcement(
+    market: Annotated[str, "exchange filter: SHA, SZA, BJA (comma-separated)"] = "SHA,SZA",
+    limit: Annotated[int, "number of announcements to return"] = 20,
+) -> str:
+    """上市公司公告 (eastmoney announcement). Public API.
+    Returns time, code, name, title, category, url."""
+    if _get_opencli_path() is None:
+        return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
+
+    args = [
+        "--market", market,
+        "--limit", str(limit),
+    ]
+
+    try:
+        data = _run_opencli("eastmoney", "announcement", args, timeout=15)
+    except FileNotFoundError:
+        return "Error: opencli not found in PATH."
+    except subprocess.TimeoutExpired:
+        return "Error: opencli eastmoney announcement timed out."
+    except (json.JSONDecodeError, RuntimeError) as exc:
+        return f"Error fetching announcement data: {exc}"
+
+    if not data:
+        return "# Company Announcements (上市公司公告)\nNo data available."
+
+    return _format_data_table(data, "Company Announcements (上市公司公告)")
+
+
+def get_index_board(
+    group: Annotated[str, "index group: main (A-share major), hk, us, all"] = "main",
+) -> str:
+    """主要市场指数行情 (eastmoney index-board). Public API.
+    Returns code, name, price, changePercent, etc for major indices."""
+    if _get_opencli_path() is None:
+        return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
+
+    args = ["--group", group]
+
+    try:
+        data = _run_opencli("eastmoney", "index-board", args, timeout=15)
+    except FileNotFoundError:
+        return "Error: opencli not found in PATH."
+    except subprocess.TimeoutExpired:
+        return "Error: opencli eastmoney index-board timed out."
+    except (json.JSONDecodeError, RuntimeError) as exc:
+        return f"Error fetching index board data: {exc}"
+
+    if not data:
+        return "# Market Index Board (主要市场指数)\nNo data available."
+
+    return _format_data_table(data, "Market Index Board (主要市场指数)")
+
+
+def get_kuaixun(
+    column: Annotated[str, "channel: 102 (important), 101 (all)"] = "102",
+    limit: Annotated[int, "number of news items"] = 20,
+) -> str:
+    """7x24 财经快讯 (eastmoney kuaixun). Public API.
+    Returns real-time financial news flashes."""
+    if _get_opencli_path() is None:
+        return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
+
+    args = [
+        "--column", column,
+        "--limit", str(limit),
+    ]
+
+    try:
+        data = _run_opencli("eastmoney", "kuaixun", args, timeout=15)
+    except FileNotFoundError:
+        return "Error: opencli not found in PATH."
+    except subprocess.TimeoutExpired:
+        return "Error: opencli eastmoney kuaixun timed out."
+    except (json.JSONDecodeError, RuntimeError) as exc:
+        return f"Error fetching kuaixun data: {exc}"
+
+    if not data:
+        return "# 7x24 Financial News (财经快讯)\nNo data available."
+
+    return _format_data_table(data, "7x24 Financial News (财经快讯)")
 
 
 def get_crypto_price(
