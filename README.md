@@ -28,6 +28,7 @@
 # TradingAgents: Multi-Agents LLM Financial Trading Framework
 
 ## News
+- [2026-05] **A-share support** — Full A-share market analysis with tencent_sina/akshare data vendors, [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) integration for capital flow / northbound / sector rankings, auto-detection of Chinese tickers, per-agent timing dashboard, and streaming report display in the CLI.
 - [2026-04] **TradingAgents v0.2.4** released with structured-output agents (Research Manager, Trader, Portfolio Manager), LangGraph checkpoint resume, persistent decision log, DeepSeek/Qwen/GLM/Azure provider support, Docker, and a Windows UTF-8 encoding fix. See [CHANGELOG.md](CHANGELOG.md) for the full list.
 - [2026-03] **TradingAgents v0.2.3** released with multi-language support, GPT-5.4 family models, unified model catalog, backtesting date fidelity, and proxy support.
 - [2026-03] **TradingAgents v0.2.2** released with GPT-5.4/Gemini 3.1/Claude 4.6 model coverage, five-tier rating scale, OpenAI Responses API, Anthropic effort control, and cross-platform stability.
@@ -166,6 +167,8 @@ python -m cli.main     # alternative: run directly from source
 ```
 You will see a screen where you can select your desired tickers, analysis date, LLM provider, research depth, and more.
 
+The CLI displays real-time progress with per-agent timing, streaming reports, and phase-level breakdowns in the footer.
+
 <p align="center">
   <img src="assets/cli/cli_init.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
@@ -179,6 +182,39 @@ An interface will appear showing results as they load, letting you track the age
 <p align="center">
   <img src="assets/cli/cli_transaction.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
+
+### A-Share Market Support
+
+TradingAgents supports **A-share (Chinese stock market) analysis** out of the box. Enter any Chinese ticker — bare 6-digit code (`000858`), exchange-suffixed (`000858.SZ`, `603208.SH`), or comma-separated list — and the framework automatically switches to tencent_sina (Tencent K-line + Sina quotes + East Money) and akshare (fundamentals, sentiment) data sources.
+
+```bash
+# Any of these work directly in the CLI:
+tradingagents         # then enter: 000858.SZ
+python -m cli.main    # then enter: 600519
+```
+
+```python
+# Or via the Python API:
+config = DEFAULT_CONFIG.copy()
+config["data_vendors"] = {
+    "core_stock_apis": "tencent_sina",
+    "fundamental_data": "tencent_sina,akshare",
+    "news_data": "tencent_sina",
+    "sentiment_data": "akshare",
+}
+ta = TradingAgentsGraph(config=config)
+_, decision = ta.propagate("000858.SZ", "2026-05-05")
+```
+
+### OpenCLI Integration (Optional)
+
+For extended A-share data — **capital flow**, **northbound capital**, **sector rankings**, **dragon-tiger list**, **hot rankings** — install [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli):
+
+```bash
+npm install -g @jackwener/opencli
+```
+
+When OpenCLI is detected, the Market Analyst automatically gains access to these additional tools, and the CLI shows a real-time market snapshot before analysis begins. OpenCLI is fully optional — the framework works without it.
 
 ## TradingAgents Package
 
