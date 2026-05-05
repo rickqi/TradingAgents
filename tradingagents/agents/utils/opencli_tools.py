@@ -41,7 +41,7 @@ def get_money_flow(
 
 @tool
 def get_sectors(
-    sector_type: Annotated[str, "sector type: industry, concept, or area"] = "industry",
+    sector_type: Annotated[str, "sector type: industry, concept, or region"] = "industry",
     limit: Annotated[int, "number of results to return"] = 10,
     sort_by: Annotated[str, "sort field: changePercent, turnover, volume, amount, rise, fall"] = "changePercent",
 ) -> str:
@@ -51,7 +51,7 @@ def get_sectors(
     and thematic trends.
 
     Args:
-        sector_type: Type of sector classification (industry, concept, area).
+        sector_type: Type of sector classification (industry, concept, region).
         limit: Number of top sectors to return.
         sort_by: Field to sort by (changePercent, turnover, volume, amount, rise, fall).
 

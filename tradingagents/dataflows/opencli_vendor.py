@@ -195,7 +195,7 @@ def get_northbound(
 
 
 def get_sectors(
-    sector_type: Annotated[str, "sector type: industry, concept, area"] = "industry",
+    sector_type: Annotated[str, "sector type: industry, concept, region"] = "industry",
     sort_by: Annotated[str, "sort field: changePercent, turnover, volume"] = "changePercent",
     limit: Annotated[int, "number of results"] = 10,
 ) -> str:
