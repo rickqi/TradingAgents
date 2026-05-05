@@ -15,22 +15,8 @@ import time
 from _share_config import (
     build_ashare_config, init_trading_agents,
     save_results, load_results, completed_tickers,
+    DEFAULT_STOCKS,
 )
-
-# Default stock list — 1万元冷门潜力股
-DEFAULT_STOCKS = [
-    ("002876.SZ", "2026-04-30", "三利谱"),
-    ("000062.SZ", "2026-04-30", "深圳华强"),
-    ("002602.SZ", "2026-04-30", "世纪华通"),
-    ("603208.SH", "2026-04-30", "东材科技"),
-    ("603298.SH", "2026-04-30", "杭叉集团"),
-    ("600744.SH", "2026-04-30", "华银电力"),
-    ("603633.SH", "2026-04-30", "徕木股份"),
-    ("300230.SZ", "2026-04-30", "永利股份"),
-    ("002507.SZ", "2026-04-30", "涪陵榨菜"),
-    ("601233.SH", "2026-04-30", "桐昆股份"),
-]
-
 
 def main():
     import json

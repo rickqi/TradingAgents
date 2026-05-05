@@ -261,7 +261,7 @@ message_buffer = MessageBuffer()
 def create_layout():
     layout = Layout()
     layout.split_column(
-        Layout(name="header", size=3),
+        Layout(name="header", size=5),
         Layout(name="main"),
         Layout(name="footer", size=3),
     )
@@ -282,16 +282,9 @@ def format_tokens(n):
 
 
 def update_display(layout, spinner_text=None, stats_handler=None, start_time=None):
-    # Header with welcome message
+    # Header — plain text, no Rich markup (avoids raw tag display on Windows).
     layout["header"].update(
-        Panel(
-            "[bold green]Welcome to TradingAgents CLI[/bold green]\n"
-            "[dim]© [Tauric Research](https://github.com/TauricResearch)[/dim]",
-            title="Welcome to TradingAgents",
-            border_style="green",
-            padding=(1, 2),
-            expand=True,
-        )
+        Text("Welcome to TradingAgents CLI  —  Tauric Research", justify="center")
     )
 
     # Progress panel showing agent status
@@ -1466,6 +1459,12 @@ def run_analysis(checkpoint: bool = False):
             console.print("[red]No results to process.[/red]")
             return
         final_state = trace[-1]
+        if "final_trade_decision" not in final_state:
+            console.print(
+                "[red]Analysis did not complete — no final decision available. "
+                "The graph may have failed before the Portfolio Manager ran.[/red]"
+            )
+            return
         decision = graph.process_signal(final_state["final_trade_decision"])
 
         # Update all agent statuses to completed

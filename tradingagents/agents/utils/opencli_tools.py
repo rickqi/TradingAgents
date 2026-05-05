@@ -43,15 +43,17 @@ def get_money_flow(
 def get_sectors(
     sector_type: Annotated[str, "sector type: industry, concept, or area"] = "industry",
     limit: Annotated[int, "number of results to return"] = 10,
+    sort_by: Annotated[str, "sort field: changePercent, turnover, volume, amount, rise, fall"] = "changePercent",
 ) -> str:
     """Retrieve sector rankings (板块排行) via OpenCLI eastmoney.
 
-    Shows top-performing sectors by change percentage, useful for
-    identifying sector rotation and thematic trends.
+    Shows top-performing sectors, useful for identifying sector rotation
+    and thematic trends.
 
     Args:
         sector_type: Type of sector classification (industry, concept, area).
         limit: Number of top sectors to return.
+        sort_by: Field to sort by (changePercent, turnover, volume, amount, rise, fall).
 
     Returns:
         Formatted sector ranking data or error message.
@@ -60,7 +62,7 @@ def get_sectors(
         return "OpenCLI not available — skip sector data"
 
     from tradingagents.dataflows.opencli_vendor import get_sectors as _get_sectors
-    return _get_sectors(sector_type=sector_type, limit=limit)
+    return _get_sectors(sector_type=sector_type, limit=limit, sort_by=sort_by)
 
 
 @tool

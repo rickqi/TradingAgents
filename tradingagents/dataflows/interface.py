@@ -230,22 +230,32 @@ def route_to_vendor(method: str, *args, **kwargs):
         raise ValueError(f"Method '{method}' not supported")
 
     # Build fallback chain: primary vendors first, then remaining available vendors.
-    # When primary includes Chinese-market vendors (tencent_sina / akshare),
-    # exclude yfinance from BOTH primary and fallback — it has no useful
-    # A-share data and its rate-limiting burns minutes of wall-clock time.
+    #
+    # Chinese-mode (primary = tencent_sina/akshare):
+    #   Skip yfinance/alpha_vantage — no useful A-share data, rate-limiting burns
+    #   minutes of wall-clock time.
+    #
+    # Non-Chinese-mode (primary = yfinance/alpha_vantage):
+    #   Skip tencent_sina/akshare — they reject non-A-share tickers ("Cannot
+    #   normalize ticker 'NVDA' to a stock code"), wasting cooldown time and
+    #   producing confusing error messages in the TUI.
     _CHINESE_VENDORS = {"tencent_sina", "akshare"}
-    _SKIP_FOR_CHINESE = {"yfinance", "alpha_vantage"}
+    _WESTERN_VENDORS = {"yfinance", "alpha_vantage"}
     is_chinese_mode = any(v in _CHINESE_VENDORS for v in primary_vendors)
 
     all_available_vendors = list(VENDOR_METHODS[method].keys())
     fallback_vendors = []
     for vendor in primary_vendors:
-        if is_chinese_mode and vendor in _SKIP_FOR_CHINESE:
+        if is_chinese_mode and vendor in _WESTERN_VENDORS:
+            continue
+        if not is_chinese_mode and vendor in _CHINESE_VENDORS:
             continue
         fallback_vendors.append(vendor)
     for vendor in all_available_vendors:
         if vendor not in fallback_vendors:
-            if is_chinese_mode and vendor in _SKIP_FOR_CHINESE:
+            if is_chinese_mode and vendor in _WESTERN_VENDORS:
+                continue
+            if not is_chinese_mode and vendor in _CHINESE_VENDORS:
                 continue
             fallback_vendors.append(vendor)
 

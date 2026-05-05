@@ -12,14 +12,35 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _build_market_tools():
-    """Build the market analyst tool list, including OpenCLI tools when available."""
+def _is_chinese_ticker(ticker: str) -> bool:
+    """Return True if ticker looks like an A-share or HK stock code.
+
+    A-share: 6-digit number (600519, 002876) optionally with .SZ/.SH/.SS suffix.
+    HK:      4-5 digit number with .HK suffix (00700.HK).
+    """
+    t = str(ticker).strip().lower()
+    for suffix in (".sz", ".sh", ".ss", ".hk"):
+        if t.endswith(suffix):
+            t = t[:-len(suffix)]
+            break
+    return t.isdigit() and 4 <= len(t) <= 6
+
+
+def _build_market_tools(include_opencli: bool = True):
+    """Build the market analyst tool list.
+
+    Args:
+        include_opencli: If False, exclude OpenCLI extended market data tools
+            even when opencli is installed.  Used to prevent the LLM from
+            calling Chinese-market tools when analyzing non-A-share tickers.
+            ToolNode (graph) always passes True so the tools remain executable.
+    """
     tools = [
         get_stock_data,
         get_indicators,
     ]
 
-    if shutil.which("opencli"):
+    if include_opencli and shutil.which("opencli"):
         try:
             from tradingagents.agents.utils.opencli_tools import (
                 get_money_flow,
@@ -42,15 +63,23 @@ def create_market_analyst(llm):
         current_date = state["trade_date"]
         instrument_context = build_instrument_context(state["company_of_interest"])
 
-        tools = _build_market_tools()
+        ticker = state["company_of_interest"]
 
-        # Determine if OpenCLI tools are available for prompt tailoring
+        # Determine if OpenCLI tools are available for prompt tailoring.
+        # Tools are always bound (ToolNode needs them for A-shares), but the
+        # guidance prompt is only included for A-share/HK tickers so the LLM
+        # doesn't use Chinese-market data to "infer" about US stocks.
         has_opencli = shutil.which("opencli") is not None
+        is_chinese = _is_chinese_ticker(ticker)
+
+        # For non-A-share tickers, exclude OpenCLI tools from bind_tools() so
+        # the LLM cannot discover or call them.  ToolNode still has the full
+        # set (via _build_market_tools(include_opencli=True) in trading_graph.py).
+        tools = _build_market_tools(include_opencli=is_chinese)
 
         opencli_tools_guidance = ""
-        if has_opencli:
+        if has_opencli and is_chinese:
             opencli_tools_guidance = """
-
 **Extended Market Data (OpenCLI):** You also have access to extended market data tools that provide information NOT available from standard stock data:
 - `get_money_flow(symbol, limit)`: Main force capital flow (主力资金净流入) — shows institutional smart money inflows/outflows. Use this to understand if large players are accumulating or distributing.
 - `get_northbound(market)`: Northbound capital flow (北向资金) via Shanghai/Shenzhen Connect — shows foreign investor sentiment toward A-shares. Use "sh" for Shanghai or "sz" for Shenzhen.

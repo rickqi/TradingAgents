@@ -1,8 +1,11 @@
+import copy
 import os
+import sys
 
 _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 
-DEFAULT_CONFIG = {
+# Immutable template — never hand out references to the nested dicts.
+_DEFAULT_CONFIG_TEMPLATE = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", os.path.join(_TRADINGAGENTS_HOME, "logs")),
     "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", os.path.join(_TRADINGAGENTS_HOME, "cache")),
@@ -52,3 +55,51 @@ DEFAULT_CONFIG = {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
 }
+
+
+def get_default_config() -> dict:
+    """Return a deep copy of the default config, safe to mutate freely.
+
+    Every call returns an independent copy — mutating the result never
+    affects subsequent calls or the module-level template.
+    """
+    return copy.deepcopy(_DEFAULT_CONFIG_TEMPLATE)
+
+
+# ---------------------------------------------------------------------------
+# Module-level DEFAULT_CONFIG that is safe to use with .copy()
+# ---------------------------------------------------------------------------
+# The problem: ``from tradingagents.default_config import DEFAULT_CONFIG``
+# captures a *reference* to the dict at import time.  If code later does
+# ``config = DEFAULT_CONFIG.copy()`` (shallow) and mutates nested dicts like
+# ``data_vendors``, the mutation leaks back into DEFAULT_CONFIG and poisons
+# every subsequent call in the same process.
+#
+# Fix: replace this module in ``sys.modules`` with a wrapper whose
+# ``__getattr__`` returns a **fresh deep copy** on every attribute access
+# of ``DEFAULT_CONFIG``.  ``from ... import DEFAULT_CONFIG`` still works
+# (Python calls ``__getattr__`` on the module during the import binding),
+# but each binding gets its own independent copy.
+#
+# ``get_default_config()`` remains available as an explicit alternative.
+# ---------------------------------------------------------------------------
+
+class _SafeConfigModule(type(sys)):
+    """Module subclass that returns a fresh deep copy for DEFAULT_CONFIG."""
+
+    def __getattr__(self, name):
+        if name == "DEFAULT_CONFIG":
+            return get_default_config()
+        raise AttributeError(f"module {self.__name__!r} has no attribute {name!r}")
+
+
+_this = sys.modules[__name__]
+_new = _SafeConfigModule(__name__)
+_new.__dict__.update(
+    {k: v for k, v in _this.__dict__.items() if not k.startswith("__")}
+)
+# Preserve dunder attributes from the real module
+_new.__file__ = __file__
+_new.__package__ = __package__
+_new.__spec__ = __spec__
+sys.modules[__name__] = _new
