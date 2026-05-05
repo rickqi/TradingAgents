@@ -123,6 +123,7 @@ class MessageBuffer:
         # Per-agent timing (optimization 2)
         self.agent_start_times: dict[str, float] = {}   # agent -> time.time()
         self.agent_end_times: dict[str, float] = {}     # agent -> time.time()
+        self.agent_first_seen: dict[str, float] = {}    # agent -> time when first chunk with their output appeared
 
         # Streaming report display (optimization 3)
         self.report_summaries: dict[str, str] = {}      # section -> summary text
@@ -164,6 +165,7 @@ class MessageBuffer:
         self._processed_message_ids.clear()
         self.agent_start_times.clear()
         self.agent_end_times.clear()
+        self.agent_first_seen.clear()
         self.report_summaries.clear()
         self.section_order.clear()
 
@@ -209,11 +211,27 @@ class MessageBuffer:
             self.current_agent = agent
 
     def get_agent_duration(self, agent) -> str:
-        """Return formatted agent duration string, e.g. '2:35' or '1:02:33'."""
+        """Return formatted agent duration string, e.g. '2:35' or '1:02:33'.
+        
+        Uses agent_start_times as primary source. Falls back to
+        agent_first_seen (time when output first appeared) if the
+        start→end gap is <1s (same-chunk race condition).
+        """
+        end = self.agent_end_times.get(agent)
+        if end is None:
+            end = time.time() if agent in self.agent_start_times else None
+        
         start = self.agent_start_times.get(agent)
         if start is None:
             return ""
-        end = self.agent_end_times.get(agent) or time.time()
+        
+        # If start and end are too close (<1s), likely a same-chunk issue.
+        # Fall back to first_seen time (when agent's output first appeared).
+        if end - start < 1.0:
+            first_seen = self.agent_first_seen.get(agent)
+            if first_seen is not None and end - first_seen >= 1.0:
+                start = first_seen
+        
         return _format_duration(end - start)
 
     def get_agent_durations(self) -> dict[str, float]:
@@ -1516,6 +1534,25 @@ def run_analysis(checkpoint: bool = False):
                             message_buffer.add_tool_call(tool_call["name"], tool_call["args"])
                         else:
                             message_buffer.add_tool_call(tool_call.name, tool_call.args)
+
+            # Track first-seen times for agents whose outputs appear in chunks.
+            # This provides a fallback when in_progress and completed happen
+            # in the same streaming chunk (same-chunk race condition).
+            now_chunk = time.time()
+            if chunk.get("investment_debate_state") and "Bull Researcher" not in message_buffer.agent_first_seen:
+                debate = chunk["investment_debate_state"]
+                if debate.get("bull_history", "").strip() or debate.get("bear_history", "").strip():
+                    for a in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
+                        if a not in message_buffer.agent_first_seen:
+                            message_buffer.agent_first_seen[a] = now_chunk
+            if chunk.get("trader_investment_plan") and "Trader" not in message_buffer.agent_first_seen:
+                message_buffer.agent_first_seen["Trader"] = now_chunk
+            if chunk.get("risk_debate_state") and "Aggressive Analyst" not in message_buffer.agent_first_seen:
+                risk = chunk["risk_debate_state"]
+                if risk.get("aggressive_history", "").strip():
+                    for a in ["Aggressive Analyst", "Conservative Analyst", "Neutral Analyst", "Portfolio Manager"]:
+                        if a not in message_buffer.agent_first_seen:
+                            message_buffer.agent_first_seen[a] = now_chunk
 
             # Update analyst statuses based on report state (runs on every chunk)
             update_analyst_statuses(message_buffer, chunk)
