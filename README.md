@@ -28,7 +28,7 @@
 # TradingAgents: Multi-Agents LLM Financial Trading Framework
 
 ## News
-- [2026-05] **A-share support** — Full A-share market analysis with tencent_sina/akshare data vendors, [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) integration for capital flow / northbound / sector rankings, auto-detection of Chinese tickers, per-agent timing dashboard, and streaming report display in the CLI.
+- [2026-05] **A-share support** — Full A-share market analysis with tencent_sina/akshare data vendors, [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) integration with 11 data tools (quotes, K-line, capital flow, northbound, sectors, dragon-tiger, hot rank, index board, news flashes, holders, announcements), auto-detection of Chinese tickers, per-agent timing dashboard, and streaming report display in the CLI.
 - [2026-04] **TradingAgents v0.2.4** released with structured-output agents (Research Manager, Trader, Portfolio Manager), LangGraph checkpoint resume, persistent decision log, DeepSeek/Qwen/GLM/Azure provider support, Docker, and a Windows UTF-8 encoding fix. See [CHANGELOG.md](CHANGELOG.md) for the full list.
 - [2026-03] **TradingAgents v0.2.3** released with multi-language support, GPT-5.4 family models, unified model catalog, backtesting date fidelity, and proxy support.
 - [2026-03] **TradingAgents v0.2.2** released with GPT-5.4/Gemini 3.1/Claude 4.6 model coverage, five-tier rating scale, OpenAI Responses API, Anthropic effort control, and cross-platform stability.
@@ -208,13 +208,27 @@ _, decision = ta.propagate("000858.SZ", "2026-05-05")
 
 ### OpenCLI Integration (Optional)
 
-For extended A-share data — **capital flow**, **northbound capital**, **sector rankings**, **dragon-tiger list**, **hot rankings** — install [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli):
+Install [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) for 11 additional A-share data tools across three analysts:
 
 ```bash
 npm install -g @jackwener/opencli
 ```
 
-When OpenCLI is detected, the Market Analyst automatically gains access to these additional tools, and the CLI shows a real-time market snapshot before analysis begins. OpenCLI is fully optional — the framework works without it.
+| Tool | Data Source | Agent | Description |
+|---|---|---|---|
+| `get_quote` | eastmoney quote | Market Analyst | Real-time quotes — PE, PB, market cap, turnover rate (16 fields) |
+| `get_kline` | eastmoney kline | Market Analyst | K-line history — configurable period (day/week/month/intraday) and price adjustment |
+| `get_money_flow` | eastmoney money-flow | Market Analyst | Main force capital flow — institutional net inflows/outflows |
+| `get_northbound` | eastmoney northbound | Market Analyst | Northbound capital — Shanghai/Shenzhen Connect foreign investor flow |
+| `get_sectors` | eastmoney sectors | Market Analyst | Sector rankings — industry/concept/region by various metrics |
+| `get_longhu` | eastmoney longhu | Market Analyst | Dragon-Tiger list — unusual institutional trading activity (with symbol filter) |
+| `get_hot_rank` | tdx hot-rank | Market Analyst | Hot stock search rankings — retail investor attention |
+| `get_index_board` | eastmoney index-board | Market Analyst | Market index board — CSI 300, SSE 50, Hang Seng, S&P 500 |
+| `get_kuaixun` | eastmoney kuaixun | Market + News | 7×24 financial news flashes — real-time market-moving events |
+| `get_holders` | eastmoney holders | Fundamentals Analyst | Top 10 institutional holders — position changes |
+| `get_announcement` | eastmoney announcement | News Analyst | Company announcements — official exchange disclosures |
+
+All 11 tools are automatically activated when analyzing A-share tickers (Chinese stock codes). They are silently skipped if OpenCLI is not installed. No configuration needed beyond the `npm install`.
 
 ## TradingAgents Package
 
