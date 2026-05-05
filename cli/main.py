@@ -120,10 +120,8 @@ class MessageBuffer:
         self.selected_analysts = []
         self._processed_message_ids = set()
 
-        # Per-agent timing (optimization 2)
-        self.agent_start_times: dict[str, float] = {}   # agent -> time.time()
-        self.agent_end_times: dict[str, float] = {}     # agent -> time.time()
-        self.agent_first_seen: dict[str, float] = {}    # agent -> time when first chunk with their output appeared
+        # Per-agent timing (wall-clock chaining)
+        self.completion_times: dict[str, float] = {}  # agent -> time.time() when output first detected
 
         # Streaming report display (optimization 3)
         self.report_summaries: dict[str, str] = {}      # section -> summary text
@@ -163,9 +161,7 @@ class MessageBuffer:
         self.messages.clear()
         self.tool_calls.clear()
         self._processed_message_ids.clear()
-        self.agent_start_times.clear()
-        self.agent_end_times.clear()
-        self.agent_first_seen.clear()
+        self.completion_times.clear()
         self.report_summaries.clear()
         self.section_order.clear()
 
@@ -200,49 +196,103 @@ class MessageBuffer:
 
     def update_agent_status(self, agent, status):
         if agent in self.agent_status:
-            now = time.time()
-            # Record start time: pending/in_progress -> in_progress
-            if status == "in_progress" and self.agent_status[agent] != "in_progress":
-                self.agent_start_times[agent] = now
-            # Record end time: any -> completed
-            elif status == "completed" and self.agent_status[agent] != "completed":
-                self.agent_end_times[agent] = now
             self.agent_status[agent] = status
             self.current_agent = agent
 
     def get_agent_duration(self, agent) -> str:
-        """Return formatted agent duration string, e.g. '2:35' or '1:02:33'.
-        
-        Uses agent_start_times as primary source. Falls back to
-        agent_first_seen (time when output first appeared) if the
-        start→end gap is <1s (same-chunk race condition).
+        """Return formatted agent duration using wall-clock chaining.
+
+        For sequential agents: duration = completion_times[agent] - completion_times[prev_agent]
+        For parallel risk group: duration = completion_times[agent] - completion_times["Trader"]
         """
-        end = self.agent_end_times.get(agent)
+        end = self.completion_times.get(agent)
         if end is None:
-            end = time.time() if agent in self.agent_start_times else None
-        
-        start = self.agent_start_times.get(agent)
-        if start is None:
             return ""
-        
-        # If start and end are too close (<1s), likely a same-chunk issue.
-        # Fall back to first_seen time (when agent's output first appeared).
-        if end - start < 1.0:
-            first_seen = self.agent_first_seen.get(agent)
-            if first_seen is not None and end - first_seen >= 1.0:
-                start = first_seen
-        
-        return _format_duration(end - start)
+
+        # Find the start time based on pipeline position
+        start_time = None
+        if agent in ("Aggressive Analyst", "Conservative Analyst", "Neutral Analyst", "Portfolio Manager"):
+            # Parallel group: all start when Trader completes
+            start_time = self.completion_times.get("Trader")
+        elif agent == "Market Analyst":
+            # First agent: use pipeline start time (stored as special key)
+            start_time = self.completion_times.get("_start")
+        elif agent in PIPELINE_ORDER:
+            # Sequential: walk backwards to find the nearest preceding agent with a completion time
+            idx = PIPELINE_ORDER.index(agent)
+            for i in range(idx - 1, -1, -1):
+                prev = PIPELINE_ORDER[i]
+                if prev in self.completion_times:
+                    start_time = self.completion_times[prev]
+                    break
+            # If no preceding agent found, use pipeline start
+            if start_time is None:
+                start_time = self.completion_times.get("_start")
+
+        if start_time is None:
+            return ""
+
+        return _format_duration(end - start_time)
 
     def get_agent_durations(self) -> dict[str, float]:
         """Return all agent durations in seconds, for JSON export."""
         result = {}
         for agent in self.agent_status:
-            start = self.agent_start_times.get(agent)
-            if start is not None:
-                end = self.agent_end_times.get(agent) or time.time()
-                result[agent] = round(end - start, 1)
+            end = self.completion_times.get(agent)
+            if end is None:
+                continue
+            start_time = None
+            if agent in ("Aggressive Analyst", "Conservative Analyst", "Neutral Analyst", "Portfolio Manager"):
+                start_time = self.completion_times.get("Trader")
+            elif agent == "Market Analyst":
+                start_time = self.completion_times.get("_start")
+            elif agent in PIPELINE_ORDER:
+                idx = PIPELINE_ORDER.index(agent)
+                for i in range(idx - 1, -1, -1):
+                    prev = PIPELINE_ORDER[i]
+                    if prev in self.completion_times:
+                        start_time = self.completion_times[prev]
+                        break
+                if start_time is None:
+                    start_time = self.completion_times.get("_start")
+            if start_time is not None:
+                result[agent] = round(end - start_time, 1)
         return result
+
+    def get_phase_durations(self) -> dict[str, float]:
+        """Return phase durations in seconds using completion times."""
+        ct = self.completion_times
+
+        phases = {}
+        # Analysts: sequential, total = last selected analyst completion - pipeline start
+        # Find the last analyst in PIPELINE_ORDER that has a completion time
+        last_analyst_end = None
+        for analyst in reversed(PIPELINE_ORDER[:4]):  # First 4 are analysts
+            if analyst in ct:
+                last_analyst_end = ct[analyst]
+                break
+        if last_analyst_end is not None and "_start" in ct:
+            phases["Analysts"] = last_analyst_end - ct["_start"]
+
+        # Research: Research Manager completion - last analyst completion
+        if "Research Manager" in ct and last_analyst_end is not None:
+            phases["Research"] = ct["Research Manager"] - last_analyst_end
+
+        # Trade: Trader completion - Research Manager completion
+        if "Trader" in ct and "Research Manager" in ct:
+            phases["Trade"] = ct["Trader"] - ct["Research Manager"]
+
+        # Risk: max risk analyst completion - Trader completion
+        risk_agents = ["Aggressive Analyst", "Conservative Analyst", "Neutral Analyst"]
+        risk_ends = [ct[a] for a in risk_agents if a in ct]
+        if risk_ends and "Trader" in ct:
+            phases["Risk"] = max(risk_ends) - ct["Trader"]
+
+        # PM: PM completion - Trader completion (PM runs during risk debate)
+        if "Portfolio Manager" in ct and "Trader" in ct:
+            phases["PM"] = ct["Portfolio Manager"] - ct["Trader"]
+
+        return phases
 
     def update_report_section(self, section_name, content):
         if section_name in self.report_sections:
@@ -624,20 +674,11 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
 
     # Phase timing summary (only when all agents complete)
     all_done = all(s == "completed" for s in message_buffer.agent_status.values())
-    if all_done and message_buffer.agent_end_times:
-        durations = message_buffer.get_agent_durations()
-        phase_defs = {
-            "Analysts": ["Market Analyst", "Social Analyst", "News Analyst", "Fundamentals Analyst"],
-            "Research": ["Bull Researcher", "Bear Researcher", "Research Manager"],
-            "Trade": ["Trader"],
-            "Risk": ["Aggressive Analyst", "Conservative Analyst", "Neutral Analyst"],
-            "PM": ["Portfolio Manager"],
-        }
+    if all_done and message_buffer.completion_times:
+        phase_durations = message_buffer.get_phase_durations()
         phase_parts = []
-        for phase_name, agents in phase_defs.items():
-            vals = [durations.get(a, 0) for a in agents if a in durations]
-            if vals:
-                phase_parts.append(f"{phase_name}: {_format_duration(max(vals))}")
+        for phase_name, dur in phase_durations.items():
+            phase_parts.append(f"{phase_name}: {_format_duration(dur)}")
         if phase_parts:
             stats_parts.append("Phase: " + " | ".join(phase_parts))
 
@@ -1053,6 +1094,24 @@ ANALYST_REPORT_MAP = {
     "news": "news_report",
     "fundamentals": "fundamentals_report",
 }
+
+# The sequential pipeline order — each agent's duration = its completion time
+# minus the previous agent's completion time (wall-clock chaining).
+PIPELINE_ORDER = [
+    "Market Analyst",
+    "Social Analyst",
+    "News Analyst",
+    "Fundamentals Analyst",
+    "Bull Researcher",
+    "Bear Researcher",
+    "Research Manager",
+    "Trader",
+    # Risk analysts are parallel — they all start when Trader completes
+    "Aggressive Analyst",
+    "Conservative Analyst",
+    "Neutral Analyst",
+    "Portfolio Manager",
+]
 
 
 def update_analyst_statuses(message_buffer, chunk):
@@ -1514,6 +1573,7 @@ def run_analysis(checkpoint: bool = False):
 
         # Stream the analysis
         trace = []
+        message_buffer.completion_times["_start"] = time.time()
         try:
           for chunk in graph.graph.stream(init_agent_state, **args):
             # Process all messages in chunk, deduplicating by message ID
@@ -1535,24 +1595,42 @@ def run_analysis(checkpoint: bool = False):
                         else:
                             message_buffer.add_tool_call(tool_call.name, tool_call.args)
 
-            # Track first-seen times for agents whose outputs appear in chunks.
-            # This provides a fallback when in_progress and completed happen
-            # in the same streaming chunk (same-chunk race condition).
+            # Record completion times (first time agent output appears)
             now_chunk = time.time()
-            if chunk.get("investment_debate_state") and "Bull Researcher" not in message_buffer.agent_first_seen:
+
+            # Analysts — their reports appear directly in chunks
+            for analyst_key, report_key in ANALYST_REPORT_MAP.items():
+                if analyst_key not in message_buffer.selected_analysts:
+                    continue
+                agent_name = ANALYST_AGENT_NAMES[analyst_key]
+                if chunk.get(report_key) and agent_name not in message_buffer.completion_times:
+                    message_buffer.completion_times[agent_name] = now_chunk
+
+            # Research team — based on debate state content
+            if chunk.get("investment_debate_state"):
                 debate = chunk["investment_debate_state"]
-                if debate.get("bull_history", "").strip() or debate.get("bear_history", "").strip():
-                    for a in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
-                        if a not in message_buffer.agent_first_seen:
-                            message_buffer.agent_first_seen[a] = now_chunk
-            if chunk.get("trader_investment_plan") and "Trader" not in message_buffer.agent_first_seen:
-                message_buffer.agent_first_seen["Trader"] = now_chunk
-            if chunk.get("risk_debate_state") and "Aggressive Analyst" not in message_buffer.agent_first_seen:
+                if debate.get("bull_history", "").strip() and "Bull Researcher" not in message_buffer.completion_times:
+                    message_buffer.completion_times["Bull Researcher"] = now_chunk
+                if debate.get("bear_history", "").strip() and "Bear Researcher" not in message_buffer.completion_times:
+                    message_buffer.completion_times["Bear Researcher"] = now_chunk
+                if debate.get("judge_decision", "").strip() and "Research Manager" not in message_buffer.completion_times:
+                    message_buffer.completion_times["Research Manager"] = now_chunk
+
+            # Trader
+            if chunk.get("trader_investment_plan") and "Trader" not in message_buffer.completion_times:
+                message_buffer.completion_times["Trader"] = now_chunk
+
+            # Risk team — based on risk debate content
+            if chunk.get("risk_debate_state"):
                 risk = chunk["risk_debate_state"]
-                if risk.get("aggressive_history", "").strip():
-                    for a in ["Aggressive Analyst", "Conservative Analyst", "Neutral Analyst", "Portfolio Manager"]:
-                        if a not in message_buffer.agent_first_seen:
-                            message_buffer.agent_first_seen[a] = now_chunk
+                if risk.get("aggressive_history", "").strip() and "Aggressive Analyst" not in message_buffer.completion_times:
+                    message_buffer.completion_times["Aggressive Analyst"] = now_chunk
+                if risk.get("conservative_history", "").strip() and "Conservative Analyst" not in message_buffer.completion_times:
+                    message_buffer.completion_times["Conservative Analyst"] = now_chunk
+                if risk.get("neutral_history", "").strip() and "Neutral Analyst" not in message_buffer.completion_times:
+                    message_buffer.completion_times["Neutral Analyst"] = now_chunk
+                if risk.get("judge_decision", "").strip() and "Portfolio Manager" not in message_buffer.completion_times:
+                    message_buffer.completion_times["Portfolio Manager"] = now_chunk
 
             # Update analyst statuses based on report state (runs on every chunk)
             update_analyst_statuses(message_buffer, chunk)
@@ -1711,6 +1789,7 @@ def run_analysis(checkpoint: bool = False):
                 "date": selections["analysis_date"],
                 "total_elapsed_seconds": round(time.time() - start_time, 1),
                 "agents": message_buffer.get_agent_durations(),
+                "phases": message_buffer.get_phase_durations(),
                 "stats": stats_handler.get_stats() if stats_handler else {},
             }
             timing_file = save_path / "timing.json"
