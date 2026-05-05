@@ -1073,10 +1073,11 @@ def update_analyst_statuses(message_buffer, chunk):
         else:
             message_buffer.update_agent_status(agent_name, "pending")
 
-    # When all analysts complete, transition research team to in_progress
+    # When all analysts complete, transition full research team to in_progress
     if not found_active and selected:
-        if message_buffer.agent_status.get("Bull Researcher") == "pending":
-            message_buffer.update_agent_status("Bull Researcher", "in_progress")
+        for agent in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
+            if message_buffer.agent_status.get(agent) == "pending":
+                message_buffer.update_agent_status(agent, "in_progress")
 
 def extract_content_string(content):
     """Extract string content from various message formats.
@@ -1552,6 +1553,7 @@ def run_analysis(checkpoint: bool = False):
                 if message_buffer.agent_status.get("Trader") != "completed":
                     message_buffer.update_agent_status("Trader", "completed")
                     message_buffer.update_agent_status("Aggressive Analyst", "in_progress")
+                    message_buffer.update_agent_status("Portfolio Manager", "in_progress")
 
             # Risk Management Team - Handle Risk Debate State
             if chunk.get("risk_debate_state"):
@@ -1581,7 +1583,6 @@ def run_analysis(checkpoint: bool = False):
                     )
                 if judge:
                     if message_buffer.agent_status.get("Portfolio Manager") != "completed":
-                        message_buffer.update_agent_status("Portfolio Manager", "in_progress")
                         message_buffer.update_report_section(
                             "final_trade_decision", f"### Portfolio Manager Decision\n{judge}"
                         )
