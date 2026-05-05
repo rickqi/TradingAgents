@@ -50,6 +50,13 @@ from .akshare_vendor import (
     get_news as get_akshare_news,
     get_global_news as get_akshare_global_news,
 )
+from .opencli_vendor import (
+    get_money_flow as opencli_get_money_flow,
+    get_sectors as opencli_get_sectors,
+    get_northbound as opencli_get_northbound,
+    get_longhu as opencli_get_longhu,
+    get_hot_rank as opencli_get_hot_rank,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -90,7 +97,17 @@ TOOLS_CATEGORIES = {
         "tools": [
             "get_sentiment",
         ]
-    }
+    },
+    "opencli_market": {
+        "description": "Extended market data via OpenCLI (money flow, sectors, northbound, longhu, hot rank)",
+        "tools": [
+            "get_money_flow",
+            "get_sectors",
+            "get_northbound",
+            "get_longhu",
+            "get_hot_rank",
+        ]
+    },
 }
 
 VENDOR_LIST = [
@@ -98,6 +115,7 @@ VENDOR_LIST = [
     "alpha_vantage",
     "tencent_sina",
     "akshare",
+    "opencli",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -161,6 +179,22 @@ VENDOR_METHODS = {
     # sentiment_data
     "get_sentiment": {
         "akshare": get_akshare_sentiment,
+    },
+    # opencli_market
+    "get_money_flow": {
+        "opencli": opencli_get_money_flow,
+    },
+    "get_sectors": {
+        "opencli": opencli_get_sectors,
+    },
+    "get_northbound": {
+        "opencli": opencli_get_northbound,
+    },
+    "get_longhu": {
+        "opencli": opencli_get_longhu,
+    },
+    "get_hot_rank": {
+        "opencli": opencli_get_hot_rank,
     },
 }
 

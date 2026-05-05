@@ -45,6 +45,7 @@ DEFAULT_CONFIG = {
         "fundamental_data": "yfinance",
         "news_data": "yfinance",
         "sentiment_data": "akshare",              # akshare only (stock_comment_em)
+        "opencli_market": "opencli",              # opencli only (extended market data)
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {

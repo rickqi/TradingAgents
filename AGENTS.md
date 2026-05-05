@@ -11,12 +11,13 @@ Multi-agent LLM financial trading framework (v0.2.4). Python package built on La
 ```bash
 python -m venv .venv          # requires Python >= 3.10, tested on 3.13
 .venv\Scripts\activate        # Windows
-pip install .                  # editable install; real deps are in pyproject.toml
+pip install .                  # copies to site-packages; real deps are in pyproject.toml
 ```
 
 - `requirements.txt` is just `.` — it installs the local package.
 - `uv.lock` exists but `pip install .` works fine without `uv`.
 - Docker alternative: `docker compose run --rm tradingagents` (needs `.env`).
+- **⚠️ `akshare` is imported but missing from pyproject.toml** — install manually: `pip install akshare`
 
 ## Environment & API Keys
 
@@ -46,6 +47,7 @@ tradingagents                   # after pip install (analyze is the default)
 python -m cli.main              # from source without install
 tradingagents --checkpoint      # SQLite checkpoint resume
 tradingagents --clear-checkpoints
+tradingagents report <DIR>      # generate Word report from analysis results
 ```
 
 **Python API:**
@@ -113,7 +115,7 @@ tradingagents/
 │   ├── tencent_sina.py   # A-share: Tencent K-line + Sina quotes + East Money APIs
 │   ├── akshare_vendor.py # A-share: AKShare — insider transactions, sentiment, per-stock financials
 │   └── alpha_vantage*.py # Alpha Vantage implementations
-├── llm_clients/       # Multi-provider LLM abstraction
+├── llm_clients/       # Multi-provider LLM abstraction → see tradingagents/llm_clients/AGENTS.md
 │   ├── factory.py     # create_llm_client() — lazy imports
 │   ├── base_client.py # BaseLLMClient, normalize_content(), DSML token stripping
 │   ├── openai_client.py  # OpenAI + all OpenAI-compatible; DeepSeekChatOpenAI subclass
@@ -126,7 +128,8 @@ tradingagents/
 cli/                   # Interactive TUI (Typer + Rich)
   ├── main.py          # Entry point: app = Typer(), @app.command() analyze
   ├── models.py        # AnalystType enum
-  └── utils.py         # TUI prompts for provider/model selection
+  ├── utils.py         # TUI prompts for provider/model selection
+  └── report_converter.py  # MD → DOCX report generation (python-docx)
 
 scripts/               # User-created analysis tooling (NOT a Python package, no __init__.py)
   ├── _share_config.py       # Shared: Windows UTF-8 fix, build_ashare_config(), init helpers
@@ -142,7 +145,7 @@ scripts/               # User-created analysis tooling (NOT a Python package, no
 
 ### Agent Pipeline Flow
 
-1. **Analyst Team** (parallelizable): Market → Social → News → Fundamentals — each uses LangGraph ToolNode for data fetching
+1. **Analyst Team**: Market → Social → News → Fundamentals — each uses LangGraph ToolNode for data fetching
 2. **Research Team**: Bull Researcher vs Bear Researcher debate (N rounds), then Research Manager produces structured `ResearchPlan`
 3. **Trader**: Reads research plan + analyst reports → structured `TraderProposal` (Buy/Hold/Sell)
 4. **Risk Management**: Aggressive/Conservative/Neutral debators evaluate
@@ -151,12 +154,13 @@ scripts/               # User-created analysis tooling (NOT a Python package, no
 ### Key Design Decisions
 
 - **Two LLMs per run**: `deep_think_llm` for complex reasoning (Research Manager, Portfolio Manager), `quick_think_llm` for everything else. Both from same provider.
-- **Structured output with graceful fallback**: Research Manager, Trader, PM use `bind_structured()`/`invoke_structured_or_freetext()` → Pydantic schema on success, free-text + DSML stripping on failure. See `tradingagents/agents/AGENTS.md`.
-- **Vendor abstraction with fallback chains**: Comma-separated vendor strings, tool-level overrides. See `tradingagents/dataflows/AGENTS.md`.
+- **Structured output with graceful fallback**: Research Manager, Trader, PM use `bind_structured()`/`invoke_structured_or_freetext()` → Pydantic schema on success, free-text + DSML stripping on failure.
+- **Vendor abstraction with fallback chains**: Comma-separated vendor strings, tool-level overrides.
 - **Memory log**: Persistent at `~/.tradingagents/memory/trading_memory.md`. Auto-resolves prior decisions with realised returns on next same-ticker run.
 - **LLM client factory**: `create_llm_client()` lazy-imports provider modules. DeepSeek gets `DeepSeekChatOpenAI` subclass for thinking-mode round-trip.
 - **Recursion limit**: `max_recur_limit` (default 250) sets LangGraph's `recursion_limit` in `propagation.py`.
 - **No circular imports**: Clean DAG: `default_config ← dataflows.config ← interface ← agent tools ← agents ← graph`.
+- **`output_language` only affects user-facing reports** (4 analysts + Portfolio Manager). Internal debate (researchers, risk debators) stays English for reasoning quality.
 
 ## Config (DEFAULT_CONFIG keys)
 
@@ -173,9 +177,6 @@ scripts/               # User-created analysis tooling (NOT a Python package, no
 | `output_language` | `"English"` | Report language (internal debate stays English) |
 | `data_vendors` | all `"yfinance"` | Per-category override. Options: `yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`. Supports comma-separated fallback chains. `sentiment_data` defaults to `"akshare"`. |
 | `tool_vendors` | `{}` | Per-tool override, takes precedence over `data_vendors` |
-| `google_thinking_level` | `None` | `"high"`, `"minimal"`, etc. |
-| `openai_reasoning_effort` | `None` | `"medium"`, `"high"`, `"low"` |
-| `anthropic_effort` | `None` | `"high"`, `"medium"`, `"low"` |
 
 Env overrides: `TRADINGAGENTS_RESULTS_DIR`, `TRADINGAGENTS_CACHE_DIR`, `TRADINGAGENTS_MEMORY_LOG_PATH`.
 
@@ -198,6 +199,25 @@ Four vendors (`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`), covering 
 - All file I/O uses explicit `encoding="utf-8"` (v0.2.4 fix for cp1252 errors).
 - Ticker symbols with special chars (`.`, `-`) are sanitized for filesystem paths via `safe_ticker_component()`.
 - `scripts/_share_config.py` auto-fixes stdout/stderr to UTF-8 on import if encoding is not already UTF-8.
+- **`debug=True` pretty_print() may crash on GBK console** when LLM returns emoji — `trading_graph.py:438` has a `try/except UnicodeEncodeError` fallback. If crashes recur, run with `PYTHONIOENCODING=utf-8`.
+
+## ⚠️ pip install . vs python -m cli.main (CRITICAL)
+
+- `pip install .` copies source to `site-packages` — changes to project source are NOT reflected until re-installed.
+- `python -m cli.main` from project root loads `cli/` and `tradingagents/` from **project source** (because `.` is on `sys.path`). This bypasses the installed copy.
+- **When modifying code, always test with `python -m cli.main`** or re-run `pip install .` after each change.
+
+## A-Share Auto-Detection
+
+CLI and `TradingAgentsGraph` both auto-detect A-share tickers and switch data vendors to `tencent_sina` + `akshare`. Detection handles:
+- Bare 6-digit codes: `002876`, `600519`
+- Exchange-suffixed: `002876.SZ`, `603208.SH`
+- Comma-separated lists: `002876.SZ,000062.SZ,603208.SH`
+- Quoted inputs: `"002876.SZ","000062.SZ"` (strips surrounding quotes)
+
+Detection happens in two places: `cli/main.py:_is_ashare_ticker()` (CLI) and `tradingagents/graph/trading_graph.py:_is_chinese_ticker()` (graph). Both must handle the same input formats.
+
+When Chinese mode is active, `route_to_vendor()` excludes both `yfinance` and `alpha_vantage` from fallback chains.
 
 ## scripts/ Import Quirks
 
@@ -221,3 +241,5 @@ Four vendors (`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`), covering 
 - Don't use `deepseek-reasoner` for structured output — it doesn't support `tool_choice`. Use `deepseek-v4-pro` or `deepseek-v4-flash` instead.
 - Don't edit `dataflows/config.py` directly — use `set_config()` or pass config to `TradingAgentsGraph()`.
 - Don't suppress type errors with `as any`, `@ts-ignore`, or empty catch blocks.
+- Don't assume `DEFAULT_CONFIG.copy()` is a deep copy — it's shallow. Nested dicts like `data_vendors` are shared references.
+- Don't forget to re-run `pip install .` after code changes if testing via the `tradingagents` console script (not needed for `python -m cli.main`).

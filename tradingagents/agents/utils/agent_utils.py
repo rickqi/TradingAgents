@@ -21,6 +21,13 @@ from tradingagents.agents.utils.news_data_tools import (
 from tradingagents.agents.utils.sentiment_tools import (
     get_sentiment,
 )
+from tradingagents.agents.utils.opencli_tools import (
+    get_money_flow,
+    get_sectors,
+    get_northbound,
+    get_longhu,
+    get_hot_rank,
+)
 
 
 def get_language_instruction() -> str:

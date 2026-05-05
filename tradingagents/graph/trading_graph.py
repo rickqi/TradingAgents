@@ -158,16 +158,18 @@ class TradingAgentsGraph:
         return kwargs
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
-        """Create tool nodes for different data sources using abstract methods."""
+        """Create tool nodes for different data sources.
+
+        Market tools are sourced from ``market_analyst._build_market_tools()`` so
+        that the ToolNode and ``bind_tools()`` always stay in sync — no duplicate
+        maintenance.
+        """
+        # Import the single-source tool list from market_analyst
+        from tradingagents.agents.analysts.market_analyst import _build_market_tools
+        market_tools = _build_market_tools()
+
         return {
-            "market": ToolNode(
-                [
-                    # Core stock data tools
-                    get_stock_data,
-                    # Technical indicators
-                    get_indicators,
-                ]
-            ),
+            "market": ToolNode(market_tools),
             "social": ToolNode(
                 [
                     # News tools for social media analysis

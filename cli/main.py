@@ -1,6 +1,8 @@
 from typing import Optional
 import datetime
 import re
+import shutil
+import json
 import typer
 from pathlib import Path
 from functools import wraps
@@ -389,9 +391,14 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
     all_messages = []
 
     # Add tool calls
+    # OpenCLI tool names for highlighting
+    _OPENCLI_TOOLS = {"get_money_flow", "get_northbound", "get_sectors", "get_longhu", "get_hot_rank"}
     for timestamp, tool_name, args in message_buffer.tool_calls:
         formatted_args = format_tool_args(args)
-        all_messages.append((timestamp, "Tool", f"{tool_name}: {formatted_args}"))
+        if tool_name in _OPENCLI_TOOLS:
+            all_messages.append((timestamp, "[cyan]OpenCLI[/cyan]", f"[cyan]{tool_name}[/cyan]: {formatted_args}"))
+        else:
+            all_messages.append((timestamp, "Tool", f"{tool_name}: {formatted_args}"))
 
     # Add regular messages
     for timestamp, msg_type, content in message_buffer.messages:
@@ -479,6 +486,18 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         elapsed_str = f"\u23f1 {int(elapsed // 60):02d}:{int(elapsed % 60):02d}"
         stats_parts.append(elapsed_str)
 
+    # OpenCLI data source indicator
+    if shutil.which("opencli"):
+        # Count OpenCLI tool calls from message buffer
+        _OPENCLI_TOOLS = {"get_money_flow", "get_northbound", "get_sectors", "get_longhu", "get_hot_rank"}
+        opencli_calls = sum(1 for _, name, _ in message_buffer.tool_calls if name in _OPENCLI_TOOLS)
+        if opencli_calls > 0:
+            stats_parts.append(f"Data: [green]OpenCLI[/green] [cyan]({opencli_calls} calls)[/cyan]")
+        else:
+            stats_parts.append("Data: [green]OpenCLI ready[/green]")
+    else:
+        stats_parts.append("Data: [dim]OpenCLI --[/dim]")
+
     stats_table = Table(show_header=False, box=None, padding=(0, 2), expand=True)
     stats_table.add_column("Stats", justify="center")
     stats_table.add_row(" | ".join(stats_parts))
@@ -511,7 +530,23 @@ def get_user_selections():
     )
     console.print(Align.center(welcome_box))
     console.print()
-    console.print()  # Add vertical space before announcements
+
+    # OpenCLI status hint
+    if shutil.which("opencli"):
+        opencli_hint = (
+            "[bold green]OpenCLI detected[/bold green] "
+            "[dim]— Extended A-share data available: capital flow, northbound, sectors, dragon-tiger list, hot rank[/dim]\n"
+            "[dim]   A-share tickers will automatically use OpenCLI data. "
+            "Use 'tradingagents screen' or 'tradingagents market' for standalone queries.[/dim]"
+        )
+    else:
+        opencli_hint = (
+            "[dim]OpenCLI not found — Install for extended A-share data (capital flow, northbound, sectors, etc.):[/dim]\n"
+            "[dim]   npm install -g @jackwener/opencli[/dim]\n"
+            "[dim]   Standard data sources (yfinance, tencent_sina) still work without it.[/dim]"
+        )
+    console.print(Panel(opencli_hint, title="OpenCLI Status", border_style="dim", padding=(0, 2)))
+    console.print()
 
     # Fetch and display announcements (silent on failure)
     announcements = fetch_announcements()
@@ -534,6 +569,10 @@ def get_user_selections():
         )
     )
     selected_ticker = get_ticker()
+
+    # Step 1.5: OpenCLI Market Snapshot (automatic, non-interactive)
+    if _is_ashare_ticker(selected_ticker) and shutil.which("opencli"):
+        _show_opencli_snapshot(selected_ticker)
 
     # Step 2: Analysis date
     default_date = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -996,6 +1035,146 @@ def _is_ashare_ticker(ticker: str) -> bool:
     return False
 
 
+def _fetch_opencli_json(site: str, command: str, args: list = None, timeout: int = 8) -> list[dict]:
+    """Execute an opencli command and return parsed JSON rows. Returns [] on any failure."""
+    import subprocess
+
+    opencli = shutil.which("opencli")
+    if not opencli:
+        return []
+    cmd = [opencli, site, command, "-f", "json"]
+    if args:
+        cmd.extend(str(a) for a in args)
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, encoding="utf-8"
+        )
+        if result.returncode != 0:
+            return []
+        return json.loads(result.stdout)
+    except Exception:
+        return []
+
+
+def _show_opencli_snapshot(ticker: str):
+    """Display a rich market snapshot panel using OpenCLI data.
+
+    Only called when: (1) opencli is in PATH, (2) ticker is A-share.
+    Non-blocking: any failure is silently skipped.
+    """
+    # Extract bare code for opencli (strip .SZ/.SH suffix)
+    bare_code = ticker.split(".")[0].split(",")[0].strip().strip('"').strip("'")
+
+    # Fetch data concurrently would be ideal but subprocess is sequential
+    # Fetch key data points
+    quote_data = _fetch_opencli_json("eastmoney", "quote", [bare_code])
+    money_data = _fetch_opencli_json("eastmoney", "money-flow", ["--limit", "5"])
+    sectors_data = _fetch_opencli_json("eastmoney", "sectors", ["--limit", "5"])
+
+    # Build snapshot content
+    parts = []
+
+    # Quote section
+    if quote_data:
+        q = quote_data[0] if isinstance(quote_data, list) and quote_data else quote_data
+        name = q.get("name", bare_code)
+        price = q.get("price", "—")
+        chg_pct = q.get("changePercent", "—")
+        vol = q.get("volume", "—")
+        pe = q.get("peDynamic", "—")
+        mkt_cap = q.get("marketCap", "—")
+        chg_sign = "+" if isinstance(chg_pct, (int, float)) and chg_pct > 0 else ""
+        parts.append(
+            f"[bold cyan]{bare_code} {name}[/bold cyan]\n"
+            f"  Price: {price}  Chg: {chg_sign}{chg_pct}%  Vol: {vol}  PE: {pe}  MC: {mkt_cap}"
+        )
+
+    # Money flow section
+    if money_data and isinstance(money_data, list) and len(money_data) > 0:
+        # Find our ticker in the money flow data
+        matched = [m for m in money_data if str(m.get("code", "")) == bare_code]
+        if matched:
+            m = matched[0]
+            main_net = m.get("mainNet", "—")
+            main_ratio = m.get("mainNetRatio", "—")
+            parts.append(
+                f"[yellow]\U0001f4b0 \u4e3b\u529b\u8d44\u91d1[/yellow]: \u51c0\u6d41\u5165 {main_net}\u4e07  \u5360\u6bd4 {main_ratio}%"
+            )
+        else:
+            parts.append("[dim]\u4e3b\u529b\u8d44\u91d1: \u672a\u5728TOP5\u6392\u884c\u4e2d[/dim]")
+
+    # Sectors section
+    if sectors_data and isinstance(sectors_data, list) and len(sectors_data) > 0:
+        top_sector = sectors_data[0]
+        parts.append(
+            f"[green]\U0001f4c8 \u677f\u5757[/green]: {top_sector.get('name', '—')} "
+            f"{top_sector.get('changePercent', '—')}%  "
+            f"\u9886\u6da8: {top_sector.get('leadStock', '—')}"
+        )
+
+    if not parts:
+        return  # No data available, skip snapshot entirely
+
+    content = "\n\n".join(parts)
+    content += "\n\n[dim]\u6570\u636e\u6765\u6e90: opencli (\u8fd1\u5b9e\u65f6) | \u4ec5\u4f9b\u53c2\u8003[/dim]"
+
+    console.print()
+    console.print(Panel(
+        content,
+        title="\U0001f4ca Market Snapshot (OpenCLI)",
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+    console.print()
+
+
+def _show_opencli_summary(ticker: str):
+    """Display OpenCLI data summary after analysis completes.
+
+    Shows aggregated data that complements the analysis.
+    """
+    bare_code = ticker.split(".")[0].split(",")[0].strip().strip('"').strip("'")
+
+    parts = []
+
+    # Fetch concise data
+    money_data = _fetch_opencli_json("eastmoney", "money-flow", ["--limit", "10"])
+    if money_data:
+        matched = [m for m in money_data if str(m.get("code", "")) == bare_code]
+        if matched:
+            m = matched[0]
+            parts.append(f"\U0001f4b0 \u4e3b\u529b\u8d44\u91d1: {bare_code} \u4eca\u65e5\u51c0\u6d41\u5165 {m.get('mainNet', '—')}\u4e07")
+        else:
+            parts.append(f"\U0001f4b0 \u4e3b\u529b\u8d44\u91d1: {bare_code} \u672a\u5728\u4eca\u65e5TOP10\u6392\u884c\u4e2d")
+
+    north_data = _fetch_opencli_json("eastmoney", "northbound")
+    if north_data:
+        parts.append("\U0001f30a \u5317\u5411\u8d44\u91d1: \u6570\u636e\u5df2\u83b7\u53d6")
+
+    longhu_data = _fetch_opencli_json("eastmoney", "longhu")
+    if longhu_data:
+        matched_codes = [l for l in (longhu_data if isinstance(longhu_data, list) else [])
+                        if str(l.get("code", "")) == bare_code]
+        if matched_codes:
+            parts.append(f"\U0001f3db \u9f99\u864e\u699c: {bare_code} \u4eca\u65e5\u4e0a\u699c")
+        else:
+            parts.append("\U0001f3db \u9f99\u864e\u699c: \u65e0\u4e0a\u699c\u8bb0\u5f55")
+
+    if not parts:
+        return
+
+    content = "\n".join(parts)
+    content += f"\n\n[dim]\u6570\u636e\u65f6\u6548: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}[/dim]"
+
+    console.print()
+    console.print(Panel(
+        content,
+        title="\U0001f4ca OpenCLI Data Summary",
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+
+
 def run_analysis(checkpoint: bool = False):
     # First get all user selections
     selections = get_user_selections()
@@ -1032,6 +1211,18 @@ def run_analysis(checkpoint: bool = False):
             "[dim]Detected A-share ticker — using tencent_sina (Tencent/Sina/EastMoney) "
             "as primary data source, akshare for fundamentals & sentiment.[/dim]"
         )
+        if shutil.which("opencli"):
+            console.print(
+                "[green]OpenCLI active[/green] — Market Analyst can access: "
+                "[cyan]capital flow[/cyan], [cyan]northbound[/cyan], [cyan]sectors[/cyan], "
+                "[cyan]dragon-tiger list[/cyan], [cyan]hot rank[/cyan]"
+            )
+        else:
+            console.print(
+                "[yellow]Tip:[/yellow] Install OpenCLI to unlock A-share capital flow, "
+                "northbound, sectors data for deeper analysis: "
+                "[dim]npm install -g @jackwener/opencli[/dim]"
+            )
 
     # Create stats callback handler for tracking LLM/tool calls
     stats_handler = StatsCallbackHandler()
@@ -1114,7 +1305,7 @@ def run_analysis(checkpoint: bool = False):
     # Now start the display layout
     layout = create_layout()
 
-    with Live(layout, refresh_per_second=4) as live:
+    with Live(layout, refresh_per_second=4, redirect_stdout=False, redirect_stderr=False) as live:
         # Initial display
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
 
@@ -1305,6 +1496,10 @@ def run_analysis(checkpoint: bool = False):
     # Post-analysis prompts (outside Live context for clean interaction)
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
 
+    # Show OpenCLI data summary if available
+    if _is_ashare_ticker(selections["ticker"]) and shutil.which("opencli"):
+        _show_opencli_summary(selections["ticker"])
+
     # Prompt to save report
     save_choice = typer.prompt("Save report?", default="Y").strip().upper()
     if save_choice in ("Y", "YES", ""):
@@ -1326,6 +1521,162 @@ def run_analysis(checkpoint: bool = False):
     display_choice = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper()
     if display_choice in ("Y", "YES", ""):
         display_complete_report(final_state)
+
+
+@app.command()
+def screen(
+    source: str = typer.Option("eastmoney", "--source", "-s",
+        help="\u6570\u636e\u6e90: eastmoney, sinafinance, tdx, ths"),
+    mode: str = typer.Option("rank", "--mode", "-m",
+        help="\u7b5b\u9009\u6a21\u5f0f: rank(\u6da8\u8dcc\u6392\u884c), money-flow(\u4e3b\u529b\u8d44\u91d1), hot(\u70ed\u5ea6), sectors(\u677f\u5757)"),
+    limit: int = typer.Option(20, "--limit", "-l",
+        help="\u8fd4\u56de\u6570\u91cf"),
+    format: str = typer.Option("table", "--format", "-f",
+        help="\u8f93\u51fa\u683c\u5f0f: table, json, csv, markdown"),
+):
+    """\u4f7f\u7528 OpenCLI \u7b5b\u9009\u5019\u9009\u80a1\u7968\u6c60 (\u9700\u8981\u5df2\u5b89\u88c5 opencli)."""
+    if not shutil.which("opencli"):
+        console.print("[red]Error: opencli not found in PATH.[/red]")
+        console.print("[dim]Install: npm install -g @jackwener/opencli[/dim]")
+        raise typer.Exit(code=1)
+
+    # Validate mode-source compatibility
+    valid_modes = {
+        "eastmoney": ["rank", "money-flow", "sectors", "hot"],
+        "sinafinance": ["rank"],
+        "tdx": ["hot"],
+        "ths": ["hot"],
+    }
+
+    source_modes = valid_modes.get(source, [])
+    if mode not in source_modes:
+        console.print(f"[red]Error: mode '{mode}' not available for source '{source}'.[/red]")
+        console.print(f"[dim]Available modes for {source}: {', '.join(source_modes)}[/dim]")
+        raise typer.Exit(code=1)
+
+    # Map mode to opencli command
+    mode_to_cmd = {
+        "rank": "rank",
+        "money-flow": "money-flow",
+        "hot": "hot-rank",
+        "sectors": "sectors",
+    }
+    opencli_cmd = mode_to_cmd[mode]
+
+    # Build and execute opencli command
+    import subprocess
+    cmd = ["opencli", source, opencli_cmd, "--limit", str(limit), "-f", format]
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30, encoding="utf-8"
+        )
+        if result.returncode != 0:
+            console.print(f"[red]OpenCLI error: {result.stderr}[/red]")
+            raise typer.Exit(code=1)
+
+        if format == "json":
+            # Parse and render as rich table
+            try:
+                data = json.loads(result.stdout)
+                if data:
+                    table = Table(
+                        title=f"{source} {mode} (TOP {limit})",
+                        show_header=True,
+                        header_style="bold magenta",
+                        box=box.ROUNDED,
+                    )
+                    # Add columns from first row keys
+                    for key in data[0].keys():
+                        table.add_column(key, justify="center")
+                    # Add rows
+                    for row in data:
+                        table.add_row(*[str(v) for v in row.values()])
+                    console.print(table)
+                else:
+                    console.print("[yellow]No data returned.[/yellow]")
+            except json.JSONDecodeError:
+                console.print(result.stdout)
+        else:
+            # For table/csv/markdown, pass through directly
+            console.print(result.stdout)
+
+    except subprocess.TimeoutExpired:
+        console.print("[red]Error: opencli command timed out (30s).[/red]")
+        raise typer.Exit(code=1)
+    except FileNotFoundError:
+        console.print("[red]Error: opencli not found.[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def market(
+    site: str = typer.Argument(
+        ...,
+        help="\u7ad9\u70b9: eastmoney, sinafinance, xueqiu, tdx, ths, binance, barchart, bloomberg",
+    ),
+    command: str = typer.Argument(
+        ...,
+        help="OpenCLI \u547d\u4ee4 (\u5982 quote, rank, kline, money-flow, sectors, longhu, northbound)",
+    ),
+    extra_args: Optional[list[str]] = typer.Argument(
+        None,
+        help="\u547d\u4ee4\u989d\u5916\u53c2\u6570 (\u5982\u80a1\u7968\u4ee3\u7801 600519)",
+    ),
+    format: str = typer.Option("table", "--format", "-f",
+        help="\u8f93\u51fa\u683c\u5f0f: table, json, csv, markdown, yaml"),
+    limit: int = typer.Option(20, "--limit", "-l",
+        help="\u8fd4\u56de\u6570\u91cf"),
+    verbose: bool = typer.Option(False, "--verbose", "-v",
+        help="\u663e\u793a\u8be6\u7ec6\u8f93\u51fa"),
+):
+    """\u900f\u4f20 OpenCLI \u8d22\u7ecf\u547d\u4ee4 (\u9700\u8981\u5df2\u5b89\u88c5 opencli).
+
+    \u793a\u4f8b:
+      tradingagents market eastmoney quote 600519 -f json
+      tradingagents market eastmoney rank --limit 10
+      tradingagents market eastmoney money-flow --limit 5 -f json
+      tradingagents market binance price BTCUSDT -f json
+      tradingagents market tdx hot-rank --limit 10
+    """
+    if not shutil.which("opencli"):
+        console.print("[red]Error: opencli not found in PATH.[/red]")
+        console.print("[dim]Install: npm install -g @jackwener/opencli[/dim]")
+        raise typer.Exit(code=1)
+
+    import subprocess
+
+    cmd = ["opencli", site, command]
+
+    # Add extra positional args (like ticker symbol)
+    if extra_args:
+        cmd.extend(extra_args)
+
+    cmd.extend(["--limit", str(limit), "-f", format])
+
+    if verbose:
+        console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30, encoding="utf-8"
+        )
+
+        if result.returncode != 0:
+            console.print(f"[red]Error: {result.stderr.strip()}[/red]")
+            raise typer.Exit(code=1)
+
+        if result.stdout.strip():
+            console.print(result.stdout)
+        else:
+            console.print("[yellow]No output returned.[/yellow]")
+
+    except subprocess.TimeoutExpired:
+        console.print("[red]Error: opencli command timed out (30s).[/red]")
+        raise typer.Exit(code=1)
+    except FileNotFoundError:
+        console.print("[red]Error: opencli not found.[/red]")
+        raise typer.Exit(code=1)
 
 
 @app.command()

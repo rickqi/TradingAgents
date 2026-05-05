@@ -10,7 +10,7 @@ agents/
 ├── schemas.py               # Pydantic models + render_* helpers
 ├── analysts/                # 4 analysts — use quick_think_llm, bind_tools()
 │   ├── market_analyst.py    # → create_market_analyst(llm)  | tools: get_stock_data, get_indicators
-│   ├── social_media_analyst.py # → create_social_media_analyst(llm) | tools: get_news
+│   ├── social_media_analyst.py # → create_social_media_analyst(llm) | tools: get_news, get_sentiment
 │   ├── news_analyst.py      # → create_news_analyst(llm)    | tools: get_news, get_global_news
 │   └── fundamentals_analyst.py # → create_fundamentals_analyst(llm) | tools: get_fundamentals, balance_sheet, cashflow, income_statement
 ├── researchers/             # 2 debators — use quick_think_llm, plain invoke
@@ -34,6 +34,7 @@ agents/
     ├── technical_indicators_tools.py # @tool get_indicators
     ├── fundamental_data_tools.py # @tool get_fundamentals, balance_sheet, cashflow, income_statement
     ├── news_data_tools.py   # @tool get_news, get_global_news, get_insider_transactions
+    ├── sentiment_tools.py   # @tool get_sentiment (akshare-only)
     └── rating.py            # Rating extraction helpers
 ```
 
@@ -116,6 +117,8 @@ result = invoke_structured_or_freetext(
 - Market analyst prompt says `"do not select both rsi and stochrsi"` — prevents redundant indicators
 - `create_msg_delete()` clears all messages between analyst nodes (Anthropic compatibility)
 - `output_language` config key is read via `get_config()` inside `get_language_instruction()` and appended to prompts
+- `get_language_instruction()` is only appended to **4 analysts + Portfolio Manager** prompts — internal debate agents (Bull/Bear, Risk debators, Research Manager, Trader) stay English for reasoning quality. This is by design.
+- `get_sentiment` tool is akshare-only — no other vendor implements this method. Only wired to social_media_analyst's tool list.
 
 ## State TypedDicts
 

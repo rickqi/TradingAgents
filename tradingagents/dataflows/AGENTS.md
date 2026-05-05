@@ -26,6 +26,19 @@ dataflows/
 3. `route_to_vendor(method)` splits the string, tries each vendor, appends remaining registered vendors on failure
 4. Cooldown between retries: 2s for rate-limit errors, 1s for other errors
 
+### A-Share Auto-Detection
+
+When Chinese mode is active (any `data_vendors` category contains `"tencent_sina"` or `"akshare"`):
+- `route_to_vendor()` skips vendors in `_SKIP_FOR_CHINESE = {"yfinance", "alpha_vantage"}`
+- These vendors have no useful A-share data and rate-limiting burns minutes
+- Detection is per-call: `is_chinese_mode` is determined fresh from `primary_vendors` each invocation
+
+Auto-detection triggers in two places:
+- CLI: `cli/main.py:_is_ashare_ticker()` — handles bare 6-digit codes, `.SZ`/`.SH` suffixes, comma-separated lists, and quoted inputs (`"002876.SZ","000062.SZ"`)
+- Graph: `tradingagents/graph/trading_graph.py:_is_chinese_ticker()` — same formats
+
+When detected, data vendors are auto-set to `tencent_sina` for most categories, `akshare` for `sentiment_data`, and `"tencent_sina,akshare"` for `fundamental_data`.
+
 **10 tool methods** in `VENDOR_METHODS`, each with up to 4 vendor implementations:
 
 | Method | Category | Vendors |
