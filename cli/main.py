@@ -99,6 +99,16 @@ class MessageBuffer:
         "final_trade_decision": (None, "Portfolio Manager"),
     }
 
+    SECTION_DISPLAY_TITLES = {
+        "market_report": "Market Analysis",
+        "sentiment_report": "Social Sentiment",
+        "news_report": "News Analysis",
+        "fundamentals_report": "Fundamentals",
+        "investment_plan": "Research Decision",
+        "trader_investment_plan": "Trading Plan",
+        "final_trade_decision": "Portfolio Decision",
+    }
+
     def __init__(self, max_length=100):
         self.messages = deque(maxlen=max_length)
         self.tool_calls = deque(maxlen=max_length)
@@ -109,6 +119,14 @@ class MessageBuffer:
         self.report_sections = {}
         self.selected_analysts = []
         self._processed_message_ids = set()
+
+        # Per-agent timing (optimization 2)
+        self.agent_start_times: dict[str, float] = {}   # agent -> time.time()
+        self.agent_end_times: dict[str, float] = {}     # agent -> time.time()
+
+        # Streaming report display (optimization 3)
+        self.report_summaries: dict[str, str] = {}      # section -> summary text
+        self.section_order: list[str] = []               # sections in order of first appearance
 
     def init_for_analysis(self, selected_analysts):
         """Initialize agent status and report sections based on selected analysts.
@@ -144,6 +162,10 @@ class MessageBuffer:
         self.messages.clear()
         self.tool_calls.clear()
         self._processed_message_ids.clear()
+        self.agent_start_times.clear()
+        self.agent_end_times.clear()
+        self.report_summaries.clear()
+        self.section_order.clear()
 
     def get_completed_reports_count(self):
         """Count reports that are finalized (their finalizing agent is completed).
@@ -176,13 +198,56 @@ class MessageBuffer:
 
     def update_agent_status(self, agent, status):
         if agent in self.agent_status:
+            now = time.time()
+            # Record start time: pending/in_progress -> in_progress
+            if status == "in_progress" and self.agent_status[agent] != "in_progress":
+                self.agent_start_times[agent] = now
+            # Record end time: any -> completed
+            elif status == "completed" and self.agent_status[agent] != "completed":
+                self.agent_end_times[agent] = now
             self.agent_status[agent] = status
             self.current_agent = agent
+
+    def get_agent_duration(self, agent) -> str:
+        """Return formatted agent duration string, e.g. '2:35' or '1:02:33'."""
+        start = self.agent_start_times.get(agent)
+        if start is None:
+            return ""
+        end = self.agent_end_times.get(agent) or time.time()
+        return _format_duration(end - start)
+
+    def get_agent_durations(self) -> dict[str, float]:
+        """Return all agent durations in seconds, for JSON export."""
+        result = {}
+        for agent in self.agent_status:
+            start = self.agent_start_times.get(agent)
+            if start is not None:
+                end = self.agent_end_times.get(agent) or time.time()
+                result[agent] = round(end - start, 1)
+        return result
 
     def update_report_section(self, section_name, content):
         if section_name in self.report_sections:
             self.report_sections[section_name] = content
+            # Track section appearance order
+            if section_name not in self.section_order:
+                self.section_order.append(section_name)
+            # Update summary
+            self.report_summaries[section_name] = self._extract_summary(content)
             self._update_current_report()
+
+    @staticmethod
+    def _extract_summary(content, max_chars=150) -> str:
+        """Extract a short summary from report content."""
+        if not content:
+            return ""
+        text = str(content).replace("\n", " ").strip()
+        # Strip markdown headings and bold
+        text = re.sub(r'#{1,6}\s+', '', text)
+        text = re.sub(r'\*{1,2}', '', text)
+        if len(text) > max_chars:
+            return text[:max_chars - 3] + "..."
+        return text
 
     def _update_current_report(self):
         # For the panel display, only show the most recently updated section
@@ -281,6 +346,71 @@ def format_tokens(n):
     return str(n)
 
 
+def _format_duration(seconds: float) -> str:
+    """Format seconds as 'M:SS' or 'H:MM:SS'."""
+    total = int(seconds)
+    if total >= 3600:
+        h, remainder = divmod(total, 3600)
+        m, s = divmod(remainder, 60)
+        return f"{h}:{m:02d}:{s:02d}"
+    else:
+        m, s = divmod(total, 60)
+        return f"{m}:{s:02d}"
+
+
+def _render_streaming_report(message_buffer):
+    """Render streaming report panel: completed=summary, active=latest content."""
+    from rich.console import Group
+
+    elements = []
+
+    for section in message_buffer.section_order:
+        title = message_buffer.SECTION_DISPLAY_TITLES.get(section, section)
+        content = message_buffer.report_sections.get(section)
+        if not content:
+            continue
+
+        # Determine if this section's finalizing agent is done
+        section_info = message_buffer.REPORT_SECTIONS.get(section)
+        finalizing_agent = section_info[1] if section_info else None
+        is_done = message_buffer.agent_status.get(finalizing_agent) == "completed"
+
+        if is_done:
+            # Completed: title with duration + summary (compact)
+            duration = message_buffer.get_agent_duration(finalizing_agent) if finalizing_agent else ""
+            header = f"✓ {title}"
+            if duration:
+                header += f" ({duration})"
+            elements.append(Text(header, style="bold green"))
+
+            summary = message_buffer.report_summaries.get(section, "")
+            if summary:
+                elements.append(Text(f"  {summary}", style="dim"))
+        else:
+            # In progress: title + latest content snippet
+            elements.append(Text(f"⟳ {title}", style="bold cyan"))
+
+            text = str(content)
+            if len(text) > 500:
+                text = "..." + text[-500:]
+            elements.append(Text(text, style="white"))
+
+    if not elements:
+        return Panel(
+            "[italic]Waiting for analysis report...[/italic]",
+            title="Current Report",
+            border_style="green",
+            padding=(1, 2),
+        )
+
+    return Panel(
+        Group(*elements),
+        title="Current Report",
+        border_style="green",
+        padding=(1, 2),
+    )
+
+
 def update_display(layout, spinner_text=None, stats_handler=None, start_time=None):
     # Header — plain text, no Rich markup (avoids raw tag display on Windows).
     layout["header"].update(
@@ -300,6 +430,7 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
     progress_table.add_column("Team", style="cyan", justify="center", width=20)
     progress_table.add_column("Agent", style="green", justify="center", width=20)
     progress_table.add_column("Status", style="yellow", justify="center", width=20)
+    progress_table.add_column("Duration", style="dim", justify="center", width=8)
 
     # Group agents by team - filter to only include agents in agent_status
     all_teams = {
@@ -338,7 +469,8 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
                 "error": "red",
             }.get(status, "white")
             status_cell = f"[{status_color}]{status}[/{status_color}]"
-        progress_table.add_row(team, first_agent, status_cell)
+        duration_str = message_buffer.get_agent_duration(first_agent)
+        progress_table.add_row(team, first_agent, status_cell, duration_str)
 
         # Add remaining agents in team
         for agent in agents[1:]:
@@ -355,10 +487,11 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
                     "error": "red",
                 }.get(status, "white")
                 status_cell = f"[{status_color}]{status}[/{status_color}]"
-            progress_table.add_row("", agent, status_cell)
+            duration_str = message_buffer.get_agent_duration(agent)
+            progress_table.add_row("", agent, status_cell, duration_str)
 
         # Add horizontal line after each team
-        progress_table.add_row("─" * 20, "─" * 20, "─" * 20, style="dim")
+        progress_table.add_row("─" * 20, "─" * 20, "─" * 20, "─" * 8, style="dim")
 
     layout["progress"].update(
         Panel(progress_table, title="Progress", border_style="cyan", padding=(1, 2))
@@ -424,25 +557,8 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         )
     )
 
-    # Analysis panel showing current report
-    if message_buffer.current_report:
-        layout["analysis"].update(
-            Panel(
-                Markdown(message_buffer.current_report),
-                title="Current Report",
-                border_style="green",
-                padding=(1, 2),
-            )
-        )
-    else:
-        layout["analysis"].update(
-            Panel(
-                "[italic]Waiting for analysis report...[/italic]",
-                title="Current Report",
-                border_style="green",
-                padding=(1, 2),
-            )
-        )
+    # Analysis panel — streaming report with all sections
+    layout["analysis"].update(_render_streaming_report(message_buffer))
 
     # Footer with statistics
     # Agent progress - derived from agent_status dict
@@ -471,7 +587,41 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
             tokens_str = "Tokens: --"
         stats_parts.append(tokens_str)
 
-    stats_parts.append(f"Reports: {reports_completed}/{reports_total}")
+    # Report progress with active report name
+    if reports_completed < reports_total:
+        active_name = None
+        for section in message_buffer.section_order:
+            section_info = message_buffer.REPORT_SECTIONS.get(section)
+            if section_info:
+                _, agent = section_info
+                if message_buffer.agent_status.get(agent) == "in_progress":
+                    active_name = message_buffer.SECTION_DISPLAY_TITLES.get(section, section)
+                    break
+        if active_name:
+            stats_parts.append(f"Reports: {reports_completed}/{reports_total} ⟳ {active_name}")
+        else:
+            stats_parts.append(f"Reports: {reports_completed}/{reports_total}")
+    else:
+        stats_parts.append(f"Reports: {reports_completed}/{reports_total} ✓")
+
+    # Phase timing summary (only when all agents complete)
+    all_done = all(s == "completed" for s in message_buffer.agent_status.values())
+    if all_done and message_buffer.agent_end_times:
+        durations = message_buffer.get_agent_durations()
+        phase_defs = {
+            "Analysts": ["Market Analyst", "Social Analyst", "News Analyst", "Fundamentals Analyst"],
+            "Research": ["Bull Researcher", "Bear Researcher", "Research Manager"],
+            "Trade": ["Trader"],
+            "Risk": ["Aggressive Analyst", "Conservative Analyst", "Neutral Analyst"],
+            "PM": ["Portfolio Manager"],
+        }
+        phase_parts = []
+        for phase_name, agents in phase_defs.items():
+            vals = [durations.get(a, 0) for a in agents if a in durations]
+            if vals:
+                phase_parts.append(f"{phase_name}: {_format_duration(max(vals))}")
+        if phase_parts:
+            stats_parts.append("Phase: " + " | ".join(phase_parts))
 
     # Elapsed time
     if start_time:
@@ -1515,6 +1665,21 @@ def run_analysis(checkpoint: bool = False):
             console.print(f"  [dim]Complete report:[/dim] {report_file.name}")
         except Exception as e:
             console.print(f"[red]Error saving report: {e}[/red]")
+
+        # Save timing data (best-effort, never blocks report save)
+        try:
+            timing_data = {
+                "ticker": selections["ticker"],
+                "date": selections["analysis_date"],
+                "total_elapsed_seconds": round(time.time() - start_time, 1),
+                "agents": message_buffer.get_agent_durations(),
+                "stats": stats_handler.get_stats() if stats_handler else {},
+            }
+            timing_file = save_path / "timing.json"
+            with open(timing_file, "w", encoding="utf-8") as f:
+                json.dump(timing_data, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass  # Timing save is best-effort
 
     # Prompt to display full report
     display_choice = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper()
