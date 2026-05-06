@@ -37,7 +37,7 @@ ALPHA_VANTAGE_API_KEY=...     # optional, for alpha_vantage data vendor
 
 Enterprise (Azure OpenAI): copy `.env.enterprise.example` → `.env.enterprise`.
 
-`main.py` and CLI both call `load_dotenv()` at startup, which reads `.env` and `.env.enterprise`.
+CLI (`cli/main.py`) calls `load_dotenv()` at startup, which reads `.env` and `.env.enterprise`.
 
 ## Running
 
