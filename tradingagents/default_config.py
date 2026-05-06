@@ -48,10 +48,10 @@ _DEFAULT_CONFIG_TEMPLATE = {
     # Options per category: yfinance, alpha_vantage, tencent_sina, akshare, twelve_data
     # Comma-separated = fallback chain (first success wins)
     "data_vendors": {
-        "core_stock_apis": "yfinance",
-        "technical_indicators": "yfinance",
-        "fundamental_data": "yfinance",
-        "news_data": "yfinance",
+        "core_stock_apis": "twelve_data,yfinance",
+        "technical_indicators": "twelve_data,yfinance",
+        "fundamental_data": "twelve_data,yfinance",
+        "news_data": "twelve_data,yfinance",
         "sentiment_data": "akshare",              # akshare only (stock_comment_em)
         "opencli_market": "opencli",              # opencli only (extended market data)
     },
