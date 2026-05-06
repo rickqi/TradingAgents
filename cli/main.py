@@ -592,6 +592,7 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         "get_quote", "get_kline", "get_index_board", "get_kuaixun", "get_holders", "get_announcement",
     }
     for timestamp, tool_name, args in message_buffer.tool_calls:
+        formatted_args = format_tool_args(args)
         if tool_name in _OPENCLI_TOOLS:
             all_messages.append((timestamp, "[cyan]OpenCLI[/cyan]", f"[cyan]{tool_name}[/cyan]: {formatted_args}"))
         else:
@@ -1537,11 +1538,29 @@ def run_analysis(checkpoint: bool = False):
     # Now start the display layout
     layout = create_layout()
 
+    # Crash diagnostic log — write to file to survive Live swallowing output
+    _diag_log = _CLI_ROOT / ".cli_diag.log"
+
+    def _diag(msg):
+        with open(_diag_log, "a", encoding="utf-8") as _f:
+            _f.write(f"{datetime.datetime.now().strftime('%H:%M:%S.%f')} {msg}\n")
+
+    # Clear previous log
+    with open(_diag_log, "w", encoding="utf-8") as _f:
+        _f.write("")
+
+    _diag("Entering Live context")
+
     with Live(layout, refresh_per_second=4, redirect_stdout=False, redirect_stderr=False) as live:
+        _diag("Live context entered")
+
         # Initial display
+        _diag("Before first update_display")
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
+        _diag("After first update_display")
 
         # Add initial messages
+        _diag("Adding initial messages")
         message_buffer.add_message("System", f"Selected ticker: {selections['ticker']}")
         message_buffer.add_message(
             "System", f"Analysis date: {selections['analysis_date']}"
@@ -1550,18 +1569,22 @@ def run_analysis(checkpoint: bool = False):
             "System",
             f"Selected analysts: {', '.join(analyst.value for analyst in selections['analysts'])}",
         )
+        _diag("Messages added, calling update_display")
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
+        _diag("update_display 2 done")
 
         # Update agent status to in_progress for the first analyst
         first_analyst = f"{selections['analysts'][0].value.capitalize()} Analyst"
         message_buffer.update_agent_status(first_analyst, "in_progress")
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
+        _diag("Agent status set, creating spinner")
 
         # Create spinner text
         spinner_text = (
             f"Analyzing {selections['ticker']} on {selections['analysis_date']}..."
         )
         update_display(layout, spinner_text, stats_handler=stats_handler, start_time=start_time)
+        _diag("Spinner set, initializing graph")
 
         # Initialize state and get graph args with callbacks
         # Auto-detect A-share / HK tickers so tencent_sina is used instead of
@@ -1569,18 +1592,22 @@ def run_analysis(checkpoint: bool = False):
         # but the CLI streams the graph directly, so we must call it here.
         graph._auto_detect_vendor(selections["ticker"])
         graph._resolve_pending_entries(selections["ticker"])
+        _diag("Auto detect vendor done")
 
         # Diagnostic: show active data vendor config
         from tradingagents.dataflows.config import get_config as get_df_config
         active_vendors = get_df_config().get("data_vendors", {})
         console.print(f"[dim]Active data_vendors: {active_vendors}[/dim]")
+        _diag(f"Active vendors: {active_vendors}")
 
         init_agent_state = graph.propagator.create_initial_state(
             selections["ticker"], selections["analysis_date"]
         )
+        _diag("Initial state created")
         # Pass callbacks to graph config for tool execution tracking
         # (LLM tracking is handled separately via LLM constructor)
         args = graph.propagator.get_graph_args(callbacks=[stats_handler])
+        _diag("Graph args ready, starting stream")
 
         # Stream the analysis
         trace = []
@@ -1730,8 +1757,13 @@ def run_analysis(checkpoint: bool = False):
             import traceback
             _error_msg = f"Graph execution failed: {e}"
             _error_tb = traceback.format_exc()
+            _diag(f"EXCEPTION in stream: {type(e).__name__}: {e}")
+            _diag(_error_tb)
         except KeyboardInterrupt:
             _interrupted = True
+            _diag("KeyboardInterrupt")
+
+        _diag(f"Stream ended. trace={len(trace)}, error={_error_msg is not None}, interrupted={_interrupted}")
 
         # Get final state and decision
         if not trace:
