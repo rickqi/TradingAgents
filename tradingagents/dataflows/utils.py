@@ -25,6 +25,9 @@ def safe_ticker_component(value, *, max_len: int = 32) -> str:
     Also accepts integer inputs (e.g. ``600183``) which the LLM may pass
     for purely-numeric stock codes.
 
+    Comma-separated tickers (e.g. ``"600050.SH,00762.HK"``) are sanitized
+    by replacing commas with ``_`` before validation.
+
     Returns ``value`` as a string when it matches the allowed pattern;
     raises ``ValueError`` otherwise.
     """
@@ -33,6 +36,8 @@ def safe_ticker_component(value, *, max_len: int = 32) -> str:
         value = str(value)
     if not value:
         raise ValueError(f"ticker must be a non-empty string, got {value!r}")
+    # Sanitize comma-separated tickers for filesystem safety.
+    value = value.replace(",", "_")
     if len(value) > max_len:
         raise ValueError(f"ticker exceeds {max_len} chars: {value!r}")
     if not _TICKER_PATH_RE.fullmatch(value):
