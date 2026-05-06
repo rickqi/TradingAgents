@@ -17,16 +17,15 @@ def _check_opencli_available() -> bool:
 
 @tool
 def get_money_flow(
-    symbol: Annotated[str, "stock symbol filter (empty string for all stocks)"] = "",
     limit: Annotated[int, "number of results to return"] = 10,
 ) -> str:
     """Retrieve main force capital flow rankings (主力资金净流入排行) via OpenCLI eastmoney.
 
     Shows which stocks have the largest net capital inflows from institutional
     and main force traders. Useful for understanding smart money movement.
+    Note: This is a market-wide ranking — individual stock filtering is not supported.
 
     Args:
-        symbol: Optional stock symbol to filter (empty for all stocks).
         limit: Number of top results to return.
 
     Returns:
@@ -36,7 +35,7 @@ def get_money_flow(
         return "OpenCLI not available — skip money flow data"
 
     from tradingagents.dataflows.opencli_vendor import get_money_flow as _get_money_flow
-    return _get_money_flow(symbol=symbol, limit=limit)
+    return _get_money_flow(limit=limit)
 
 
 @tool

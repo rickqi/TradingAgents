@@ -141,19 +141,16 @@ def _format_data_table(data: list[dict], title: str) -> str:
 # ---------------------------------------------------------------------------
 
 def get_money_flow(
-    symbol: Annotated[str, "stock symbol filter (empty for all)"] = "",
     limit: Annotated[int, "number of results"] = 10,
-    period: Annotated[str, "time period: today, 5d, 10d"] = "today",
+    range: Annotated[str, "time range: today, 5d, 10d"] = "today",
 ) -> str:
     """主力资金净流入排行 (eastmoney money-flow). Public API, no browser."""
     if _get_opencli_path() is None:
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
 
     args = ["--limit", str(limit)]
-    if symbol:
-        args.extend(["--symbol", symbol])
-    if period != "today":
-        args.extend(["--period", period])
+    if range != "today":
+        args.extend(["--range", range])
 
     try:
         data = _run_opencli("eastmoney", "money-flow", args, timeout=15)
