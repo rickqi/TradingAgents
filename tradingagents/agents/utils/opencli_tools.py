@@ -42,7 +42,7 @@ def get_money_flow(
 def get_sectors(
     sector_type: Annotated[str, "sector type: industry, concept, or region"] = "industry",
     limit: Annotated[int, "number of results to return"] = 10,
-    sort_by: Annotated[str, "sort field: changePercent, turnover, volume, amount, rise, fall"] = "changePercent",
+    sort_by: Annotated[str, "sort field: change, drop, money-flow, out-flow, turnover"] = "change",
 ) -> str:
     """Retrieve sector rankings (板块排行) via OpenCLI eastmoney.
 
@@ -52,7 +52,7 @@ def get_sectors(
     Args:
         sector_type: Type of sector classification (industry, concept, region).
         limit: Number of top sectors to return.
-        sort_by: Field to sort by (changePercent, turnover, volume, amount, rise, fall).
+        sort_by: Field to sort by (change, drop, money-flow, out-flow, turnover).
 
     Returns:
         Formatted sector ranking data or error message.
@@ -66,24 +66,26 @@ def get_sectors(
 
 @tool
 def get_northbound(
-    market: Annotated[str, "market: sh (Shanghai) or sz (Shenzhen)"] = "sh",
+    direction: Annotated[str, "direction: north (inflow to A-share) or south (inflow to HK)"] = "north",
+    limit: Annotated[int, "number of recent minutes"] = 10,
 ) -> str:
-    """Retrieve northbound capital flow data (沪深港通北向资金) via OpenCLI eastmoney.
+    """Retrieve northbound/southbound capital flow data (沪深港通北向/南向资金) via OpenCLI eastmoney.
 
-    Shows real-time northbound (Hong Kong → Mainland) capital flow,
-    a key indicator of foreign investor sentiment toward A-shares.
+    Shows real-time northbound (Hong Kong → Mainland) or southbound (Mainland → HK)
+    capital flow, a key indicator of foreign investor sentiment.
 
     Args:
-        market: Target market — sh for Shanghai, sz for Shenzhen.
+        direction: Flow direction — north for foreign inflow to A-shares, south for mainland inflow to HK.
+        limit: Number of recent minutes to retrieve.
 
     Returns:
-        Formatted northbound capital flow data or error message.
+        Formatted capital flow data or error message.
     """
     if not _check_opencli_available():
         return "OpenCLI not available — skip northbound data"
 
     from tradingagents.dataflows.opencli_vendor import get_northbound as _get_northbound
-    return _get_northbound(market=market)
+    return _get_northbound(direction=direction, limit=limit)
 
 
 @tool
@@ -255,7 +257,7 @@ def get_index_board(
 
 @tool
 def get_kuaixun(
-    column: Annotated[str, "channel: 102 (important), 101 (all)"] = "102",
+    column: Annotated[int, "channel ID: 102 (important), 101 (all)"] = 102,
     limit: Annotated[int, "number of items"] = 20,
 ) -> str:
     """Retrieve 7x24 financial news flashes (财经快讯) via OpenCLI eastmoney.
@@ -274,4 +276,4 @@ def get_kuaixun(
         return "OpenCLI not available — skip kuaixun data"
 
     from tradingagents.dataflows.opencli_vendor import get_kuaixun as _get_kuaixun
-    return _get_kuaixun(column=column, limit=limit)
+    return _get_kuaixun(column=str(column), limit=limit)

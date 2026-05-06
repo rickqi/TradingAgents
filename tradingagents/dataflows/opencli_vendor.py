@@ -168,13 +168,14 @@ def get_money_flow(
 
 
 def get_northbound(
-    market: Annotated[str, "market: sh (Shanghai) or sz (Shenzhen)"] = "sh",
+    direction: Annotated[str, "direction: north (inflow to A-share) or south (inflow to HK)"] = "north",
+    limit: Annotated[int, "number of recent minutes"] = 10,
 ) -> str:
-    """沪深港通北向资金分时净流入 (eastmoney northbound). Public API."""
+    """沪深港通北向/南向资金分时净流入 (eastmoney northbound). Public API."""
     if _get_opencli_path() is None:
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
 
-    args = ["--market", market]
+    args = ["--direction", direction, "--limit", str(limit)]
 
     try:
         data = _run_opencli("eastmoney", "northbound", args, timeout=15)
@@ -193,7 +194,7 @@ def get_northbound(
 
 def get_sectors(
     sector_type: Annotated[str, "sector type: industry, concept, region"] = "industry",
-    sort_by: Annotated[str, "sort field: changePercent, turnover, volume"] = "changePercent",
+    sort_by: Annotated[str, "sort field: change, drop, money-flow, out-flow, turnover"] = "change",
     limit: Annotated[int, "number of results"] = 10,
 ) -> str:
     """板块排行 (eastmoney sectors). Public API."""
@@ -427,7 +428,7 @@ def get_kuaixun(
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
 
     args = [
-        "--column", column,
+        "--column", str(column),
         "--limit", str(limit),
     ]
 

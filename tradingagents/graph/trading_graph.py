@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 import sys
 from pathlib import Path
 import json
@@ -176,6 +177,21 @@ class TradingAgentsGraph:
         from tradingagents.agents.analysts.market_analyst import _build_market_tools
         market_tools = _build_market_tools()
 
+        # OpenCLI tools for other analysts (only loaded when opencli is installed)
+        _opencli_news_tools = []
+        _opencli_fundamentals_tools = []
+        if shutil.which("opencli"):
+            try:
+                from tradingagents.agents.utils.opencli_tools import (
+                    get_holders,
+                    get_announcement,
+                    get_kuaixun,
+                )
+                _opencli_fundamentals_tools = [get_holders]
+                _opencli_news_tools = [get_announcement, get_kuaixun]
+            except ImportError:
+                pass
+
         return {
             "market": ToolNode(market_tools),
             "social": ToolNode(
@@ -193,6 +209,7 @@ class TradingAgentsGraph:
                     get_global_news,
                     get_insider_transactions,
                 ]
+                + _opencli_news_tools
             ),
             "fundamentals": ToolNode(
                 [
@@ -202,6 +219,7 @@ class TradingAgentsGraph:
                     get_cashflow,
                     get_income_statement,
                 ]
+                + _opencli_fundamentals_tools
             ),
         }
 

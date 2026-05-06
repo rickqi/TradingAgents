@@ -48,6 +48,34 @@ app = typer.Typer(
 @app.callback()
 def main(
     ctx: typer.Context,
+    ticker: Optional[str] = typer.Option(
+        None, "--ticker", "-t",
+        help="Ticker symbol — skip interactive prompts and run analysis directly",
+    ),
+    date: Optional[str] = typer.Option(
+        None, "--date", "-d",
+        help="Analysis date (YYYY-MM-DD), default: today",
+    ),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", "-p",
+        help="LLM provider: deepseek, openai, google, anthropic, xai, qwen, glm, openrouter, ollama",
+    ),
+    depth: Optional[int] = typer.Option(
+        None, "--depth",
+        help="Research depth / debate rounds (1-3, default: 1)",
+    ),
+    lang: Optional[str] = typer.Option(
+        None, "--lang", "-l",
+        help="Output language (English, Chinese, etc.)",
+    ),
+    analysts: Optional[str] = typer.Option(
+        None, "--analysts", "-a",
+        help="Comma-separated analysts: market,social,news,fundamentals (default: all)",
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y",
+        help="Non-interactive: auto-save report and print results (no prompts)",
+    ),
     checkpoint: bool = typer.Option(
         False,
         "--checkpoint",
@@ -71,7 +99,13 @@ def main(
         from tradingagents.graph.checkpointer import clear_all_checkpoints
         n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
         console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
-    run_analysis(checkpoint=checkpoint, diag=diag)
+    run_analysis(
+        checkpoint=checkpoint, diag=diag,
+        cli_overrides={
+            "ticker": ticker, "date": date, "provider": provider,
+            "depth": depth, "lang": lang, "analysts": analysts, "yes": yes,
+        } if ticker else None,
+    )
 
 
 # Create a deque to store recent messages with a maximum length
@@ -1413,9 +1447,202 @@ def _show_opencli_summary(ticker: str):
     ))
 
 
-def run_analysis(checkpoint: bool = False, diag: bool = False):
-    # First get all user selections
-    selections = get_user_selections()
+# ── Direct-mode helpers ──────────────────────────────────────────────────────
+
+# Provider → (api_key_env, default_quick_model, default_deep_model)
+_PROVIDER_DEFAULTS = {
+    "deepseek":   ("DEEPSEEK_API_KEY",    "deepseek-v4-flash",          "deepseek-v4-pro"),
+    "openai":     ("OPENAI_API_KEY",       "gpt-5.4-mini",               "gpt-5.4"),
+    "google":     ("GOOGLE_API_KEY",       "gemini-3-flash-preview",     "gemini-3.1-pro-preview"),
+    "anthropic":  ("ANTHROPIC_API_KEY",    "claude-sonnet-4-6",          "claude-opus-4-6"),
+    "xai":        ("XAI_API_KEY",          "grok-4-1-fast-non-reasoning","grok-4-0709"),
+    "qwen":       ("DASHSCOPE_API_KEY",    "qwen3.5-flash",              "qwen3.6-plus"),
+    "glm":        ("ZHIPU_API_KEY",        "glm-4.7",                    "glm-5.1"),
+    "openrouter": ("OPENROUTER_API_KEY",   "openai/gpt-5.4-mini",        "openai/gpt-5.4"),
+}
+
+
+def _get_default_provider() -> tuple:
+    """Return (provider, quick_model, deep_model) for the first provider with an API key."""
+    import os
+    for provider, (env_var, quick, deep) in _PROVIDER_DEFAULTS.items():
+        if os.environ.get(env_var):
+            return provider, quick, deep
+    return "openai", "gpt-5.4-mini", "gpt-5.4"  # fallback
+
+
+def _build_selections_from_args(overrides: dict) -> dict:
+    """Build selections dict from CLI arguments (non-interactive mode)."""
+    # Provider and models
+    provider_input = overrides.get("provider")
+    if provider_input:
+        provider = provider_input.lower()
+        defaults = _PROVIDER_DEFAULTS.get(provider)
+        if defaults:
+            _, quick_model, deep_model = defaults
+        else:
+            quick_model, deep_model = "gpt-5.4-mini", "gpt-5.4"
+    else:
+        provider, quick_model, deep_model = _get_default_provider()
+
+    # Date
+    date_str = overrides.get("date")
+    if date_str:
+        # Validate format
+        datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    else:
+        date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    # Language: default to Chinese for A-share tickers
+    ticker_val = overrides["ticker"]
+    lang = overrides.get("lang")
+    if not lang:
+        lang = "Chinese" if _is_ashare_ticker(ticker_val) else "English"
+
+    # Analysts
+    analysts_str = overrides.get("analysts")
+    if analysts_str:
+        valid = {"market", "social", "news", "fundamentals"}
+        selected = [AnalystType(a.strip()) for a in analysts_str.split(",") if a.strip() in valid]
+        if not selected:
+            selected = [AnalystType(a) for a in AnalystType]
+    else:
+        selected = [AnalystType(a) for a in AnalystType]
+
+    # Research depth
+    depth = overrides.get("depth") or 1
+
+    return {
+        "ticker": ticker_val,
+        "analysis_date": date_str,
+        "analysts": selected,
+        "research_depth": depth,
+        "llm_provider": provider,
+        "backend_url": None,
+        "shallow_thinker": quick_model,
+        "deep_thinker": deep_model,
+        "google_thinking_level": None,
+        "openai_reasoning_effort": None,
+        "anthropic_effort": None,
+        "output_language": lang,
+    }
+
+
+def _run_headless(graph, selections, config, start_time, report_dir, auto_yes, stats_handler):
+    """Run analysis in headless mode (no TUI, direct text output)."""
+    ticker = selections["ticker"]
+    date = selections["analysis_date"]
+
+    console.print(f"\n[bold]Analyzing {ticker} on {date}...[/bold]\n")
+
+    try:
+        final_state, decision = graph.propagate(ticker, date)
+    except Exception as e:
+        console.print(f"\n[bold red]Analysis failed: {e}[/bold red]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        return
+
+    elapsed = time.time() - start_time
+
+    # Display decision
+    console.print(Rule(f"Analysis Complete ({elapsed:.1f}s)"))
+
+    # Extract structured decision if available
+    if decision:
+        console.print(Panel(
+            str(decision),
+            title=f"Decision: {ticker}",
+            border_style="green",
+            padding=(1, 2),
+        ))
+
+    # Show timing
+    agent_durations = message_buffer.get_agent_durations()
+    if agent_durations:
+        timing_table = Table(title="Agent Timing", show_header=True, box=box.SIMPLE)
+        timing_table.add_column("Agent", style="cyan")
+        timing_table.add_column("Duration", style="green", justify="right")
+        for agent, dur in agent_durations.items():
+            timing_table.add_row(agent, f"{dur:.1f}s")
+        console.print(timing_table)
+
+    # Save report
+    if auto_yes:
+        save_choice = "Y"
+    else:
+        save_choice = typer.prompt("\nSave report?", default="Y").strip().upper()
+
+    if save_choice in ("Y", "YES", ""):
+        from tradingagents.dataflows.utils import safe_ticker_component
+        safe_ticker = ticker.replace("/", "_").replace("\\", "_")
+        try:
+            safe_ticker = safe_ticker_component(safe_ticker)
+        except ValueError:
+            safe_ticker = re.sub(r"[^A-Za-z0-9._\-\^]", "_", ticker)
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = Path.cwd() / "reports" / f"{safe_ticker}_{timestamp}"
+        save_path.mkdir(parents=True, exist_ok=True)
+
+        try:
+            report_file = save_report_to_disk(final_state, ticker, save_path)
+            console.print(f"[green]✓ Report saved to:[/green] {save_path.resolve()}")
+            console.print(f"  [dim]Complete report:[/dim] {report_file.name}")
+        except Exception as e:
+            console.print(f"[red]Error saving report: {e}[/red]")
+
+        # Save timing
+        try:
+            timing_data = {
+                "ticker": ticker,
+                "date": date,
+                "total_elapsed_seconds": round(elapsed, 1),
+                "agents": agent_durations,
+                "stats": stats_handler.get_stats() if stats_handler else {},
+            }
+            with open(save_path / "timing.json", "w", encoding="utf-8") as f:
+                json.dump(timing_data, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+        # Convert to Word (best-effort)
+        try:
+            from tradingagents.utils.report_converter import convert_report_dir_to_docx
+            convert_report_dir_to_docx(save_path, ticker=ticker, analysis_date=date)
+        except Exception:
+            pass
+
+    # Display full report
+    if auto_yes:
+        display_choice = "Y"
+    else:
+        display_choice = typer.prompt("\nDisplay full report?", default="Y").strip().upper()
+
+    if display_choice in ("Y", "YES", "") and final_state:
+        display_complete_report(final_state)
+
+
+def run_analysis(checkpoint: bool = False, diag: bool = False, cli_overrides: dict = None):
+    # Determine interactive vs headless mode
+    headless = cli_overrides and cli_overrides.get("ticker")
+    auto_yes = cli_overrides.get("yes", False) if cli_overrides else False
+
+    if headless:
+        selections = _build_selections_from_args(cli_overrides)
+        console.print(Panel(
+            f"[bold]TradingAgents Direct Mode[/bold]\n\n"
+            f"[cyan]Ticker:[/cyan]   {selections['ticker']}\n"
+            f"[cyan]Date:[/cyan]     {selections['analysis_date']}\n"
+            f"[cyan]Provider:[/cyan] {selections['llm_provider']}\n"
+            f"[cyan]Models:[/cyan]   {selections['shallow_thinker']} / {selections['deep_thinker']}\n"
+            f"[cyan]Depth:[/cyan]    {selections['research_depth']}\n"
+            f"[cyan]Language:[/cyan] {selections['output_language']}",
+            title="Analysis Configuration",
+            border_style="cyan",
+        ))
+    else:
+        selections = get_user_selections()
 
     # Create config with selected research depth
     config = DEFAULT_CONFIG.copy()
@@ -1539,6 +1766,10 @@ def run_analysis(checkpoint: bool = False, diag: bool = False):
     message_buffer.add_message = save_message_decorator(message_buffer, "add_message")
     message_buffer.add_tool_call = save_tool_call_decorator(message_buffer, "add_tool_call")
     message_buffer.update_report_section = save_report_section_decorator(message_buffer, "update_report_section")
+
+    # ── Headless mode: skip TUI, run graph.propagate() directly ──
+    if headless:
+        return _run_headless(graph, selections, config, start_time, report_dir, auto_yes, stats_handler)
 
     # Now start the display layout
     layout = create_layout()
@@ -1898,18 +2129,26 @@ def screen(
         console.print(f"[dim]Available modes for {source}: {', '.join(source_modes)}[/dim]")
         raise typer.Exit(code=1)
 
-    # Map mode to opencli command
-    mode_to_cmd = {
-        "rank": "rank",
-        "money-flow": "money-flow",
-        "hot": "hot-rank",
-        "sectors": "sectors",
+    # Map (source, mode) to opencli command — some sources use different names
+    cmd_map = {
+        ("eastmoney", "rank"): "rank",
+        ("eastmoney", "money-flow"): "money-flow",
+        ("eastmoney", "sectors"): "sectors",
+        ("eastmoney", "hot"): "hot-rank",
+        ("sinafinance", "rank"): "stock-rank",
+        ("tdx", "hot"): "hot-rank",
+        ("ths", "hot"): "hot-rank",
     }
-    opencli_cmd = mode_to_cmd[mode]
+    opencli_cmd = cmd_map.get((source, mode), mode)
 
     # Build and execute opencli command
     import subprocess
-    cmd = ["opencli", source, opencli_cmd, "--limit", str(limit), "-f", format]
+    opencli_path = shutil.which("opencli")
+    cmd = [opencli_path, source, opencli_cmd]
+    # Some sources don't support --limit (e.g. sinafinance stock-rank)
+    if source != "sinafinance":
+        cmd.extend(["--limit", str(limit)])
+    cmd.extend(["-f", format])
 
     try:
         result = subprocess.run(
@@ -1990,13 +2229,18 @@ def market(
 
     import subprocess
 
-    cmd = ["opencli", site, command]
+    opencli_path = shutil.which("opencli")
+    cmd = [opencli_path, site, command]
 
     # Add extra positional args (like ticker symbol)
     if extra_args:
         cmd.extend(extra_args)
 
-    cmd.extend(["--limit", str(limit), "-f", format])
+    # Commands that don't support --limit
+    _NO_LIMIT = {"quote", "kline", "stock-rank", "index-board", "longhu"}
+    if command not in _NO_LIMIT:
+        cmd.extend(["--limit", str(limit)])
+    cmd.extend(["-f", format])
 
     if verbose:
         console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
