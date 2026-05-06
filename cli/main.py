@@ -1583,6 +1583,8 @@ def run_analysis(checkpoint: bool = False):
 
         # Stream the analysis
         trace = []
+        _error_msg = None
+        _error_tb = None
         message_buffer.completion_times["_start"] = time.time()
         try:
           for chunk in graph.graph.stream(init_agent_state, **args):
@@ -1722,16 +1724,17 @@ def run_analysis(checkpoint: bool = False):
             trace.append(chunk)
 
         except Exception as e:
-            console.print(f"\n[bold red]Graph execution failed: {e}[/bold red]")
+            # Capture error details inside Live context (Live may swallow output)
             import traceback
-            traceback.print_exc()
-            if not trace:
-                console.print("[red]No chunks were processed — the graph failed at startup.[/red]")
-                return
-            console.print(f"[yellow]Partial results: {len(trace)} chunks were processed before failure.[/yellow]")
+            _error_msg = f"Graph execution failed: {e}"
+            _error_tb = traceback.format_exc()
 
         # Get final state and decision
         if not trace:
+            # Print error outside Live context where it's visible
+            if _error_msg:
+                console.print(f"\n[bold red]{_error_msg}[/bold red]")
+                console.print(f"[dim]{_error_tb}[/dim]")
             console.print("[red]No results to process.[/red]")
             return
         final_state = trace[-1]
