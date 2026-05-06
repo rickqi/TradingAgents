@@ -60,6 +60,18 @@ def _wait_for_credit() -> None:
         _credit_timestamps.append(time.monotonic())
 
 
+def _refund_last_credit() -> None:
+    """Refund the most recently consumed API credit.
+
+    Called when a request fails with 404 or a plan-restriction error,
+    so the rate limiter is not depleted by endpoints that are unavailable
+    on the current pricing tier.
+    """
+    with _credit_lock:
+        if _credit_timestamps:
+            _credit_timestamps.pop()
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -76,6 +88,8 @@ def _make_api_request(endpoint: str, params: dict) -> dict:
     """Make an API request to Twelve Data. Returns parsed JSON.
 
     Automatically throttles to stay within the per-minute credit limit.
+    If the response is a 404 or a plan-restriction error, the credit is
+    refunded so the rate limiter is not needlessly consumed.
 
     Raises:
         ValueError: On Twelve Data API-level errors.
@@ -86,11 +100,24 @@ def _make_api_request(endpoint: str, params: dict) -> dict:
     params["apikey"] = get_api_key()
     url = f"{API_BASE_URL}/{endpoint}"
     response = requests.get(url, params=params, timeout=30)
+
+    # 404 = endpoint not available on current plan — refund credit
+    if response.status_code == 404:
+        _refund_last_credit()
+        raise ValueError(
+            f"Twelve Data endpoint '/{endpoint}' not available "
+            f"(404 — may require a paid plan)"
+        )
+
     response.raise_for_status()
     data = response.json()
     # Twelve Data returns {"status": "error", "message": "..."} on failures
     if data.get("status") == "error":
-        raise ValueError(f"Twelve Data API error: {data.get('message', 'Unknown error')}")
+        msg = data.get("message", "Unknown error")
+        # Plan-restriction errors also shouldn't consume a credit
+        if "pro or ultra" in msg or "premium" in msg.lower():
+            _refund_last_credit()
+        raise ValueError(f"Twelve Data API error: {msg}")
     return data
 
 
