@@ -9,9 +9,10 @@ from functools import wraps
 from rich.console import Console
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-load_dotenv(".env.enterprise", override=False)
+# Load environment variables from the package root (works regardless of cwd)
+_CLI_ROOT = Path(__file__).resolve().parent.parent  # project root (one level up from cli/)
+load_dotenv(_CLI_ROOT / ".env")
+load_dotenv(_CLI_ROOT / ".env.enterprise", override=False)
 from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.live import Live
@@ -1585,6 +1586,7 @@ def run_analysis(checkpoint: bool = False):
         trace = []
         _error_msg = None
         _error_tb = None
+        _interrupted = False
         message_buffer.completion_times["_start"] = time.time()
         try:
           for chunk in graph.graph.stream(init_agent_state, **args):
@@ -1728,38 +1730,36 @@ def run_analysis(checkpoint: bool = False):
             import traceback
             _error_msg = f"Graph execution failed: {e}"
             _error_tb = traceback.format_exc()
+        except KeyboardInterrupt:
+            _interrupted = True
 
         # Get final state and decision
         if not trace:
-            # Print error outside Live context where it's visible
-            if _error_msg:
-                console.print(f"\n[bold red]{_error_msg}[/bold red]")
-                console.print(f"[dim]{_error_tb}[/dim]")
-            console.print("[red]No results to process.[/red]")
-            return
-        final_state = trace[-1]
-        if "final_trade_decision" not in final_state:
-            console.print(
-                "[red]Analysis did not complete — no final decision available. "
-                "The graph may have failed before the Portfolio Manager ran.[/red]"
+            pass  # error / interrupt handled outside Live context below
+        else:
+            final_state = trace[-1]
+            if "final_trade_decision" not in final_state:
+                console.print(
+                    "[red]Analysis did not complete — no final decision available. "
+                    "The graph may have failed before the Portfolio Manager ran.[/red]"
+                )
+                return
+            decision = graph.process_signal(final_state["final_trade_decision"])
+
+            # Update all agent statuses to completed
+            for agent in message_buffer.agent_status:
+                message_buffer.update_agent_status(agent, "completed")
+
+            message_buffer.add_message(
+                "System", f"Completed analysis for {selections['analysis_date']}"
             )
-            return
-        decision = graph.process_signal(final_state["final_trade_decision"])
 
-        # Update all agent statuses to completed
-        for agent in message_buffer.agent_status:
-            message_buffer.update_agent_status(agent, "completed")
+            # Update final report sections
+            for section in message_buffer.report_sections.keys():
+                if section in final_state:
+                    message_buffer.update_report_section(section, final_state[section])
 
-        message_buffer.add_message(
-            "System", f"Completed analysis for {selections['analysis_date']}"
-        )
-
-        # Update final report sections
-        for section in message_buffer.report_sections.keys():
-            if section in final_state:
-                message_buffer.update_report_section(section, final_state[section])
-
-        update_display(layout, stats_handler=stats_handler, start_time=start_time)
+            update_display(layout, stats_handler=stats_handler, start_time=start_time)
 
     # Convert report_dir MDs to Word (best-effort, post-stream)
     try:
@@ -1772,6 +1772,15 @@ def run_analysis(checkpoint: bool = False):
         pass
 
     # Post-analysis prompts (outside Live context for clean interaction)
+    if _interrupted:
+        console.print("\n[yellow]Analysis interrupted by user (Ctrl+C).[/yellow]")
+        return
+    if not trace:
+        if _error_msg:
+            console.print(f"\n[bold red]{_error_msg}[/bold red]")
+            console.print(f"[dim]{_error_tb}[/dim]")
+        console.print("[red]No results to process.[/red]")
+        return
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
 
     # Show OpenCLI data summary if available
