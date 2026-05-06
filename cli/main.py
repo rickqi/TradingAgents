@@ -586,9 +586,11 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
 
     # Add tool calls
     # OpenCLI tool names for highlighting
-    _OPENCLI_TOOLS = {"get_money_flow", "get_northbound", "get_sectors", "get_longhu", "get_hot_rank"}
+    _OPENCLI_TOOLS = {
+        "get_money_flow", "get_northbound", "get_sectors", "get_longhu", "get_hot_rank",
+        "get_quote", "get_kline", "get_index_board", "get_kuaixun", "get_holders", "get_announcement",
+    }
     for timestamp, tool_name, args in message_buffer.tool_calls:
-        formatted_args = format_tool_args(args)
         if tool_name in _OPENCLI_TOOLS:
             all_messages.append((timestamp, "[cyan]OpenCLI[/cyan]", f"[cyan]{tool_name}[/cyan]: {formatted_args}"))
         else:
@@ -688,17 +690,25 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         elapsed_str = f"\u23f1 {int(elapsed // 60):02d}:{int(elapsed % 60):02d}"
         stats_parts.append(elapsed_str)
 
-    # OpenCLI data source indicator
+    # Data source indicator — show active vendor + OpenCLI status
+    from tradingagents.dataflows.config import get_config as _get_df_config
+    _active_vendors = _get_df_config().get("data_vendors", {})
+    _core_vendor = _active_vendors.get("core_stock_apis", "")
+    # Pick the primary vendor (first in comma-separated chain)
+    _primary_vendor = _core_vendor.split(",")[0] if _core_vendor else "unknown"
+
+    _OPENCLI_TOOLS = {
+        "get_money_flow", "get_northbound", "get_sectors", "get_longhu", "get_hot_rank",
+        "get_quote", "get_kline", "get_index_board", "get_kuaixun", "get_holders", "get_announcement",
+    }
+    opencli_calls = sum(1 for _, name, _ in message_buffer.tool_calls if name in _OPENCLI_TOOLS)
     if shutil.which("opencli"):
-        # Count OpenCLI tool calls from message buffer
-        _OPENCLI_TOOLS = {"get_money_flow", "get_northbound", "get_sectors", "get_longhu", "get_hot_rank"}
-        opencli_calls = sum(1 for _, name, _ in message_buffer.tool_calls if name in _OPENCLI_TOOLS)
         if opencli_calls > 0:
-            stats_parts.append(f"Data: [green]OpenCLI[/green] [cyan]({opencli_calls} calls)[/cyan]")
+            stats_parts.append(f"Data: [green]{_primary_vendor}[/green] + [cyan]OpenCLI({opencli_calls})[/cyan]")
         else:
-            stats_parts.append("Data: [green]OpenCLI ready[/green]")
+            stats_parts.append(f"Data: [green]{_primary_vendor}[/green] [dim]+ OpenCLI[/dim]")
     else:
-        stats_parts.append("Data: [dim]OpenCLI --[/dim]")
+        stats_parts.append(f"Data: [green]{_primary_vendor}[/green]")
 
     stats_table = Table(show_header=False, box=None, padding=(0, 2), expand=True)
     stats_table.add_column("Stats", justify="center")
