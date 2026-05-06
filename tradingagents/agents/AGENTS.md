@@ -9,10 +9,10 @@ agents/
 ├── __init__.py              # 重新导出所有 create_* 函数（通配符）
 ├── schemas.py               # Pydantic 模型 + render_* 辅助函数
 ├── analysts/                # 4 个分析师 — 使用 quick_think_llm，bind_tools()
-│   ├── market_analyst.py    # → create_market_analyst(llm)  | 工具: get_stock_data, get_indicators
+│   ├── market_analyst.py    # → create_market_analyst(llm)  | 工具: get_stock_data, get_indicators + 8 个 OpenCLI 工具
 │   ├── social_media_analyst.py # → create_social_media_analyst(llm) | 工具: get_news, get_sentiment
-│   ├── news_analyst.py      # → create_news_analyst(llm)    | 工具: get_news, get_global_news
-│   └── fundamentals_analyst.py # → create_fundamentals_analyst(llm) | 工具: get_fundamentals, balance_sheet, cashflow, income_statement
+│   ├── news_analyst.py      # → create_news_analyst(llm)    | 工具: get_news, get_global_news + 2 个 OpenCLI 工具
+│   └── fundamentals_analyst.py # → create_fundamentals_analyst(llm) | 工具: get_fundamentals, balance_sheet, cashflow, income_statement + 1 个 OpenCLI 工具
 ├── researchers/             # 2 个辩论者 — 使用 quick_think_llm，普通 invoke
 │   ├── bull_researcher.py   # → create_bull_researcher(llm)
 │   └── bear_researcher.py   # → create_bear_researcher(llm)
@@ -35,6 +35,7 @@ agents/
     ├── fundamental_data_tools.py # @tool get_fundamentals, balance_sheet, cashflow, income_statement
     ├── news_data_tools.py   # @tool get_news, get_global_news, get_insider_transactions
     ├── sentiment_tools.py   # @tool get_sentiment（仅 akshare）
+    ├── opencli_tools.py     # @tool 11 个 OpenCLI A 股数据工具（可选，需安装 opencli）
     └── rating.py            # 评级提取辅助函数
 ```
 
@@ -119,6 +120,27 @@ result = invoke_structured_or_freetext(
 - `output_language` 配置键通过 `get_config()` 在 `get_language_instruction()` 中读取并附加到提示中
 - `get_language_instruction()` 仅附加到 **4 个分析师 + Portfolio Manager** 的提示中 — 内部辩论智能体（Bull/Bear、风险辩论者、Research Manager、Trader）保持英文以确保推理质量。这是有意为之的设计。
 - `get_sentiment` 工具仅 akshare 提供 — 其他供应商未实现此方法。仅连接到 social_media_analyst 的工具列表。
+
+## OpenCLI 扩展工具（`opencli_tools.py`）
+
+11 个 `@tool` 装饰的 A 股数据工具，通过 OpenCLI（`@jackwener/opencli` npm 包）调用东方财富、通达信等数据源。
+
+**激活条件**：`shutil.which("opencli")` 检测到安装 + 分析的是 A 股/HK 股票代码。未安装时静默跳过。
+
+**工具分布**（通过 `trading_graph.py:_create_tool_nodes()` 和 `market_analyst.py:_build_market_tools()` 注册）：
+
+| 分析师 | OpenCLI 工具 | 数据源 |
+|--------|-------------|--------|
+| Market Analyst（8 个） | `get_quote`, `get_kline`, `get_money_flow`, `get_northbound`, `get_sectors`, `get_longhu`, `get_hot_rank`, `get_index_board` | eastmoney, tdx |
+| News Analyst（2 个） | `get_announcement`, `get_kuaixun` | eastmoney |
+| Fundamentals Analyst（1 个） | `get_holders` | eastmoney |
+
+**注册机制**：
+- Market Analyst 的 8 个工具通过 `_build_market_tools()` 在 `market_analyst.py` 中动态加载（`include_opencli=True/False` 由 `_is_chinese_ticker` 控制）
+- News 和 Fundamentals 的 3 个工具在 `trading_graph.py:_create_tool_nodes()` 中追加到对应 ToolNode
+- Social Analyst 无 OpenCLI 工具
+
+**实现模式**：每个 `@tool` 函数调用 `dataflows/opencli_vendor.py` 中的 vendor 函数 → vendor 函数通过 `subprocess.run(opencli_path, ...)` 执行 OpenCLI CLI → 解析 stdout 输出 → 格式化为 markdown 表格。
 
 ## 状态 TypedDict
 

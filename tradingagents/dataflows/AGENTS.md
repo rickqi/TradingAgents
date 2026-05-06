@@ -16,7 +16,8 @@ dataflows/
 ├── alpha_vantage_common.py # 共用工具: 日期解析, 限速检测, API key 检查
 ├── alpha_vantage_*.py      # Alpha Vantage: 股票行情, 技术指标, 基本面, 新闻
 ├── tencent_sina.py         # A 股: 腾讯 K 线 + 新浪行情 + 东方财富 API
-└── akshare_vendor.py       # A 股: AKShare — 内幕交易, 情绪, 个股财报
+├── akshare_vendor.py       # A 股: AKShare — 内幕交易, 情绪, 个股财报
+└── opencli_vendor.py       # A 股: OpenCLI — 11 个 A 股数据函数 + 1 个加密货币函数（可选）
 ```
 
 ## 供应商路由机制
@@ -96,3 +97,31 @@ dataflows/
 - `initialize_config()` — 在模块导入时调用，因此 `_config` 始终就绪
 
 **不要直接编辑 `config.py`** — 应调用 `set_config()` 或将 config 传给 `TradingAgentsGraph()`。
+
+## opencli_vendor（A 股可选扩展）
+
+`opencli_vendor.py` 是一个独立的数据层，不通过 `VENDOR_METHODS` 路由。它直接被 `agents/utils/opencli_tools.py` 中的 `@tool` 函数调用。
+
+**12 个 vendor 函数**（11 个 A 股 + 1 个加密货币）：
+
+| 函数 | OpenCLI 命令 | 说明 |
+|------|-------------|------|
+| `get_quote` | `opencli eastmoney quote` | 实时行情：PE、PB、总市值、换手率等 16 个字段 |
+| `get_kline` | `opencli eastmoney kline` | K 线历史：可配置周期（日/周/月/分钟）和复权方式 |
+| `get_money_flow` | `opencli eastmoney money-flow` | 主力资金流向：机构净流入/流出 |
+| `get_northbound` | `opencli eastmoney northbound` | 北向资金：`--direction north/south`，`--limit N` |
+| `get_sectors` | `opencli eastmoney sectors` | 板块排名：`--sort change/drop/money-flow/turnover` |
+| `get_longhu` | `opencli eastmoney longhu` | 龙虎榜：异常机构交易活动（支持股票代码过滤） |
+| `get_hot_rank` | `opencli tdx hot-rank` | 热门搜索排行：散户关注度 |
+| `get_index_board` | `opencli eastmoney index-board` | 指数面板：沪深 300、上证 50、恒生、标普 500 |
+| `get_holders` | `opencli eastmoney holders` | 前十大机构持仓：仓位变动 |
+| `get_announcement` | `opencli eastmoney announcement` | 公司公告：交易所官方披露 |
+| `get_kuaixun` | `opencli eastmoney kuaixun` | 7×24 财经快讯：`--column 102`（A 股），`--limit N` |
+| `get_crypto_price` | `opencli binance price` | 加密货币价格（仅 CLI `market` 命令使用，无 @tool 包装） |
+
+**实现细节**：
+- `_run_opencli(args)` — 通过 `subprocess.run()` 调用 `shutil.which("opencli")` 返回的完整路径（Windows 上 `opencli.CMD`）
+- 所有函数返回格式化的 markdown 表格字符串（`_format_data_table()`）
+- 非阻塞：`opencli` 不在 `pyproject.toml` 依赖中，未安装时所有工具静默跳过
+- 超时 30 秒，失败返回错误字符串（不抛异常，不影响分析流水线）
+- `get_crypto_price` 是唯一的非 A 股函数，无 `@tool` 包装，仅通过 CLI `market` 子命令使用

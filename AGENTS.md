@@ -37,7 +37,7 @@ ALPHA_VANTAGE_API_KEY=...     # 可选，alpha_vantage 数据源
 
 企业版（Azure OpenAI）：复制 `.env.enterprise.example` → `.env.enterprise`。
 
-CLI（`cli/main.py`）启动时调用 `load_dotenv()`，读取 `.env` 和 `.env.enterprise`。
+CLI（`cli/main.py`）启动时调用 `load_dotenv()`，先从源码根目录加载（`_CLI_ROOT/.env`），再从当前工作目录加载作为回退（`pip install .` 后 `tradingagents` 命令的 `_CLI_ROOT` 指向 site-packages，需要 CWD 回退才能找到项目目录下的 `.env`）。
 
 ## 运行方式
 

@@ -9,10 +9,17 @@ from functools import wraps
 from rich.console import Console
 from dotenv import load_dotenv
 
-# Load environment variables from the package root (works regardless of cwd)
-_CLI_ROOT = Path(__file__).resolve().parent.parent  # project root (one level up from cli/)
+# Load environment variables — try project root first (source runs), then CWD (pip-installed runs)
+_CLI_ROOT = Path(__file__).resolve().parent.parent  # project root when running from source
 load_dotenv(_CLI_ROOT / ".env")
 load_dotenv(_CLI_ROOT / ".env.enterprise", override=False)
+# Fallback: also load from cwd so `tradingagents` installed via pip can find .env in the project dir
+_cwd_env = Path.cwd() / ".env"
+if _cwd_env.exists() and _cwd_env.resolve() != (_CLI_ROOT / ".env").resolve():
+    load_dotenv(_cwd_env, override=False)
+_cwd_ent = Path.cwd() / ".env.enterprise"
+if _cwd_ent.exists() and _cwd_ent.resolve() != (_CLI_ROOT / ".env.enterprise").resolve():
+    load_dotenv(_cwd_ent, override=False)
 from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.live import Live
