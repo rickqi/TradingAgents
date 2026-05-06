@@ -7,8 +7,10 @@ conventions used by yfinance and alpha_vantage vendors.
 API docs: https://twelvedata.com/docs
 """
 import os
+import time
 import json
 import logging
+import threading
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
@@ -18,6 +20,44 @@ from typing import Annotated
 logger = logging.getLogger(__name__)
 
 API_BASE_URL = "https://api.twelvedata.com"
+
+# ---------------------------------------------------------------------------
+# Per-minute rate limiter (free tier: 8 API credits / minute)
+# ---------------------------------------------------------------------------
+_CREDITS_PER_MINUTE = 8
+_credit_lock = threading.Lock()
+_credit_timestamps: list[float] = []  # monotonic timestamps of recent calls
+
+
+def _wait_for_credit() -> None:
+    """Block until an API credit is available under the per-minute limit."""
+    with _credit_lock:
+        now = time.monotonic()
+        # Prune timestamps older than 60 seconds
+        cutoff = now - 60.0
+        while _credit_timestamps and _credit_timestamps[0] < cutoff:
+            _credit_timestamps.pop(0)
+        # If at capacity, wait until the oldest slot frees up
+        if len(_credit_timestamps) >= _CREDITS_PER_MINUTE:
+            wait_until = _credit_timestamps[0] + 60.0
+            wait_secs = wait_until - now
+            if wait_secs > 0:
+                logger.info(
+                    "Twelve Data rate limiter: waiting %.1fs for API credit slot",
+                    wait_secs,
+                )
+                # Release lock while sleeping so other threads don't deadlock
+                _credit_lock.release()
+                try:
+                    time.sleep(wait_secs)
+                finally:
+                    _credit_lock.acquire()
+                now = time.monotonic()
+                # Prune again after waking
+                cutoff = now - 60.0
+                while _credit_timestamps and _credit_timestamps[0] < cutoff:
+                    _credit_timestamps.pop(0)
+        _credit_timestamps.append(time.monotonic())
 
 
 # ---------------------------------------------------------------------------
@@ -35,10 +75,13 @@ def get_api_key() -> str:
 def _make_api_request(endpoint: str, params: dict) -> dict:
     """Make an API request to Twelve Data. Returns parsed JSON.
 
+    Automatically throttles to stay within the per-minute credit limit.
+
     Raises:
         ValueError: On Twelve Data API-level errors.
         requests.HTTPError: On HTTP-level errors.
     """
+    _wait_for_credit()
     params = params.copy()
     params["apikey"] = get_api_key()
     url = f"{API_BASE_URL}/{endpoint}"
