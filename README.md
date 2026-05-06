@@ -31,9 +31,9 @@
 
 - [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板，以及 CLI 中的流式报告展示。
 
-  ![1778045286797.png](assets\README\1778045286797.png)
+  ![1778045286797.png](assets/README/1778045286797.png)
 
-  ![1778045422170.png](assets\README\1778045422170.png)![1778045422170.png](assets\README\1778045422170.png)![1778045422170.png](assets\README\1778045422170.png)![1778045422170.png](assets\README\1778045422170.png)
+  ![1778045422170.png](assets/README/1778045422170.png) ![1778045422167.png](assets/README/1778045422167.png) ![1778045422168.png](assets/README/1778045422168.png) ![1778045422169.png](assets/README/1778045422169.png)
 - [2026-04] **TradingAgents v0.2.4** 发布，新增结构化输出智能体（Research Manager、Trader、Portfolio Manager）、LangGraph 检查点恢复、持久化决策日志、DeepSeek/Qwen/GLM/Azure 供应商支持、Docker 支持，以及 Windows UTF-8 编码修复。完整更新列表见 [CHANGELOG.md](CHANGELOG.md)。
 - [2026-03] **TradingAgents v0.2.3** 发布，新增多语言支持、GPT-5.4 系列模型、统一模型目录、回测日期精度，以及代理支持。
 - [2026-03] **TradingAgents v0.2.2** 发布，新增 GPT-5.4/Gemini 3.1/Claude 4.6 模型覆盖、五级评级体系、OpenAI Responses API、Anthropic effort control，以及跨平台稳定性改进。
