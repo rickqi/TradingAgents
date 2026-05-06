@@ -28,7 +28,12 @@
 # TradingAgents：多智能体 LLM 金融交易框架
 
 ## 更新动态
-- [2026-05] **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) 提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板，以及 CLI 中的流式报告展示。
+
+- [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板，以及 CLI 中的流式报告展示。
+
+  ![1778045286797.png](assets\README\1778045286797.png)
+
+  ![1778045422170.png](assets\README\1778045422170.png)![1778045422170.png](assets\README\1778045422170.png)![1778045422170.png](assets\README\1778045422170.png)![1778045422170.png](assets\README\1778045422170.png)
 - [2026-04] **TradingAgents v0.2.4** 发布，新增结构化输出智能体（Research Manager、Trader、Portfolio Manager）、LangGraph 检查点恢复、持久化决策日志、DeepSeek/Qwen/GLM/Azure 供应商支持、Docker 支持，以及 Windows UTF-8 编码修复。完整更新列表见 [CHANGELOG.md](CHANGELOG.md)。
 - [2026-03] **TradingAgents v0.2.3** 发布，新增多语言支持、GPT-5.4 系列模型、统一模型目录、回测日期精度，以及代理支持。
 - [2026-03] **TradingAgents v0.2.2** 发布，新增 GPT-5.4/Gemini 3.1/Claude 4.6 模型覆盖、五级评级体系、OpenAI Responses API、Anthropic effort control，以及跨平台稳定性改进。
@@ -68,6 +73,7 @@ TradingAgents 是一个多智能体交易框架，模拟了真实交易公司的
 我们的框架将复杂的交易任务分解为专业化的角色。这确保了系统在市场分析和决策制定方面拥有稳健且可扩展的方法。
 
 ### 分析师团队
+
 - 基本面分析师：评估公司财务状况和业绩指标，识别内在价值和潜在风险信号。
 - 情绪分析师：使用情绪评分算法分析社交媒体和公众情绪，衡量短期市场情绪。
 - 新闻分析师：监控全球新闻和宏观经济指标，解读事件对市场状况的影响。
@@ -78,6 +84,7 @@ TradingAgents 是一个多智能体交易框架，模拟了真实交易公司的
 </p>
 
 ### 研究员团队
+
 - 由看涨和看跌研究员组成，他们批判性地评估分析师团队提供的洞察。通过结构化的辩论，他们权衡潜在收益与固有风险。
 
 <p align="center">
@@ -85,6 +92,7 @@ TradingAgents 是一个多智能体交易框架，模拟了真实交易公司的
 </p>
 
 ### 交易智能体
+
 - 综合分析师和研究员的报告，做出明智的交易决策。它基于全面的市场洞察来确定交易的时机和规模。
 
 <p align="center">
@@ -92,6 +100,7 @@ TradingAgents 是一个多智能体交易框架，模拟了真实交易公司的
 </p>
 
 ### 风险管理与投资组合经理
+
 - 通过评估市场波动性、流动性及其他风险因素，持续评估投资组合风险。风险管理团队评估并调整交易策略，向投资组合经理提供评估报告以供最终决策。
 - 投资组合经理批准或拒绝交易提案。如果批准，订单将发送到模拟交易所并执行。
 
@@ -104,18 +113,21 @@ TradingAgents 是一个多智能体交易框架，模拟了真实交易公司的
 ### 安装
 
 克隆 TradingAgents：
+
 ```bash
 git clone https://github.com/TauricResearch/TradingAgents.git
 cd TradingAgents
 ```
 
 在你喜欢的环境管理器中创建虚拟环境：
+
 ```bash
 conda create -n tradingagents python=3.13
 conda activate tradingagents
 ```
 
 安装包及其依赖：
+
 ```bash
 pip install .
 ```
@@ -123,12 +135,14 @@ pip install .
 ### Docker
 
 也可以使用 Docker 运行：
+
 ```bash
 cp .env.example .env  # add your API keys
 docker compose run --rm tradingagents
 ```
 
 使用 Ollama 运行本地模型：
+
 ```bash
 docker compose --profile ollama run --rm tradingagents-ollama
 ```
@@ -154,6 +168,7 @@ export ALPHA_VANTAGE_API_KEY=...   # Alpha Vantage
 对于本地模型，在配置中将 `llm_provider` 设置为 `"ollama"`。
 
 或者，将 `.env.example` 复制为 `.env` 并填入你的 Key：
+
 ```bash
 cp .env.example .env
 ```
@@ -161,10 +176,12 @@ cp .env.example .env
 ### CLI 使用
 
 启动交互式 CLI：
+
 ```bash
 tradingagents          # installed command
 python -m cli.main     # alternative: run directly from source
 ```
+
 你将看到一个界面，可以选择目标股票代码、分析日期、LLM 供应商、研究深度等。
 
 CLI 会实时显示进度，包括每个智能体的耗时统计、流式报告以及底部的阶段级别分解。
@@ -214,19 +231,19 @@ _, decision = ta.propagate("000858.SZ", "2026-05-05")
 npm install -g @jackwener/opencli
 ```
 
-| Tool | Data Source | Agent | 说明 |
-|---|---|---|---|
-| `get_quote` | eastmoney quote | Market Analyst | 实时行情：PE、PB、总市值、换手率等 16 个字段 |
-| `get_kline` | eastmoney kline | Market Analyst | K 线历史：可配置周期（日/周/月/分钟）和复权方式 |
-| `get_money_flow` | eastmoney money-flow | Market Analyst | 主力资金流向：机构净流入/流出 |
-| `get_northbound` | eastmoney northbound | Market Analyst | 北向资金：沪港通/深港通外资流向 |
-| `get_sectors` | eastmoney sectors | Market Analyst | 板块排名：行业/概念/地区多维度排序 |
-| `get_longhu` | eastmoney longhu | Market Analyst | 龙虎榜：异常机构交易活动（支持股票代码过滤） |
-| `get_hot_rank` | tdx hot-rank | Market Analyst | 热门搜索排行：散户关注度 |
-| `get_index_board` | eastmoney index-board | Market Analyst | 指数面板：沪深 300、上证 50、恒生、标普 500 |
-| `get_kuaixun` | eastmoney kuaixun | Market + News | 7×24 财经快讯：实时市场动态 |
-| `get_holders` | eastmoney holders | Fundamentals Analyst | 前十大机构持仓：仓位变动 |
-| `get_announcement` | eastmoney announcement | News Analyst | 公司公告：交易所官方披露 |
+| Tool                 | Data Source            | Agent                | 说明                                            |
+| -------------------- | ---------------------- | -------------------- | ----------------------------------------------- |
+| `get_quote`        | eastmoney quote        | Market Analyst       | 实时行情：PE、PB、总市值、换手率等 16 个字段    |
+| `get_kline`        | eastmoney kline        | Market Analyst       | K 线历史：可配置周期（日/周/月/分钟）和复权方式 |
+| `get_money_flow`   | eastmoney money-flow   | Market Analyst       | 主力资金流向：机构净流入/流出                   |
+| `get_northbound`   | eastmoney northbound   | Market Analyst       | 北向资金：沪港通/深港通外资流向                 |
+| `get_sectors`      | eastmoney sectors      | Market Analyst       | 板块排名：行业/概念/地区多维度排序              |
+| `get_longhu`       | eastmoney longhu       | Market Analyst       | 龙虎榜：异常机构交易活动（支持股票代码过滤）    |
+| `get_hot_rank`     | tdx hot-rank           | Market Analyst       | 热门搜索排行：散户关注度                        |
+| `get_index_board`  | eastmoney index-board  | Market Analyst       | 指数面板：沪深 300、上证 50、恒生、标普 500     |
+| `get_kuaixun`      | eastmoney kuaixun      | Market + News        | 7×24 财经快讯：实时市场动态                    |
+| `get_holders`      | eastmoney holders      | Fundamentals Analyst | 前十大机构持仓：仓位变动                        |
+| `get_announcement` | eastmoney announcement | News Analyst         | 公司公告：交易所官方披露                        |
 
 分析 A 股股票代码时，11 个工具会自动激活。如果未安装 OpenCLI，它们会被静默跳过。除了 `npm install` 之外，无需任何额外配置。
 
@@ -269,6 +286,87 @@ print(decision)
 ```
 
 查看 `tradingagents/default_config.py` 了解所有配置选项。
+
+### 配置与定制
+
+TradingAgents 通过 `DEFAULT_CONFIG` 字典提供灵活的配置能力。所有配置均通过 Python API 传入，CLI 模式下会自动交互式选择。
+
+#### LLM 供应商与模型选择
+
+框架采用**双模型架构**：复杂推理（Research Manager、Portfolio Manager）使用 `deep_think_llm`，其余智能体使用 `quick_think_llm`，两者来自同一供应商。
+
+```python
+config = DEFAULT_CONFIG.copy()
+config["llm_provider"] = "deepseek"              # 供应商选择
+config["deep_think_llm"] = "deepseek-v4-pro"     # 复杂推理模型
+config["quick_think_llm"] = "deepseek-v4-flash"  # 快速任务模型
+config["backend_url"] = None                     # None = 使用供应商默认端点
+```
+
+支持的供应商：`openai`, `google`, `anthropic`, `xai`, `deepseek`, `qwen`, `glm`, `openrouter`, `ollama`, `azure`
+
+#### 供应商高级配置
+
+部分供应商支持推理 effort 控制：
+
+```python
+config["google_thinking_level"] = "high"    # Google Gemini
+config["openai_reasoning_effort"] = "high"  # OpenAI
+config["anthropic_effort"] = "high"         # Anthropic Claude
+```
+
+#### 辩论与研究深度
+
+控制智能体之间的辩论轮次，影响分析深度：
+
+```python
+config["max_debate_rounds"] = 2         # 研究员看涨/看跌辩论轮次（默认 1）
+config["max_risk_discuss_rounds"] = 2   # 风险管理辩论轮次（默认 1）
+config["max_recur_limit"] = 250         # LangGraph 递归限制（默认 250）
+```
+
+#### 数据供应商配置
+
+支持 4 个数据供应商（`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`），按类别配置，支持逗号分隔的降级链：
+
+```python
+# 美股默认配置
+config["data_vendors"] = {
+    "core_stock_apis": "yfinance",          # 也可以用 alpha_vantage
+    "technical_indicators": "yfinance",
+    "fundamental_data": "yfinance",
+    "news_data": "yfinance",
+    "sentiment_data": "akshare",            # 仅 akshare 支持
+}
+
+# A 股配置（自动检测中文股票代码时也会自动切换）
+config["data_vendors"] = {
+    "core_stock_apis": "tencent_sina",
+    "technical_indicators": "tencent_sina",
+    "fundamental_data": "tencent_sina,akshare",  # 降级链：先尝试 tencent_sina
+    "news_data": "tencent_sina",
+    "sentiment_data": "akshare",                  # 情绪数据仅 akshare
+}
+
+# 工具级别覆盖（优先级高于类别配置）
+config["tool_vendors"] = {
+    "get_stock_data": "alpha_vantage",     # 仅对 get_stock_data 使用 alpha_vantage
+}
+```
+
+#### 输出语言与路径配置
+
+```python
+config["output_language"] = "Chinese"      # 报告语言（内部辩论始终使用英文）
+```
+
+通过环境变量覆盖存储路径：
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `TRADINGAGENTS_RESULTS_DIR` | `~/.tradingagents/logs` | 分析结果输出目录 |
+| `TRADINGAGENTS_CACHE_DIR` | `~/.tradingagents/cache` | 数据缓存和检查点目录 |
+| `TRADINGAGENTS_MEMORY_LOG_PATH` | `~/.tradingagents/memory/trading_memory.md` | 决策日志路径 |
 
 ## 持久化与恢复
 
