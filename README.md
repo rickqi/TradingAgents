@@ -25,15 +25,15 @@
 
 ---
 
-# TradingAgents: Multi-Agents LLM Financial Trading Framework
+# TradingAgents：多智能体 LLM 金融交易框架
 
-## News
-- [2026-05] **A-share support** — Full A-share market analysis with tencent_sina/akshare data vendors, [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) integration with 11 data tools (quotes, K-line, capital flow, northbound, sectors, dragon-tiger, hot rank, index board, news flashes, holders, announcements), auto-detection of Chinese tickers, per-agent timing dashboard, and streaming report display in the CLI.
-- [2026-04] **TradingAgents v0.2.4** released with structured-output agents (Research Manager, Trader, Portfolio Manager), LangGraph checkpoint resume, persistent decision log, DeepSeek/Qwen/GLM/Azure provider support, Docker, and a Windows UTF-8 encoding fix. See [CHANGELOG.md](CHANGELOG.md) for the full list.
-- [2026-03] **TradingAgents v0.2.3** released with multi-language support, GPT-5.4 family models, unified model catalog, backtesting date fidelity, and proxy support.
-- [2026-03] **TradingAgents v0.2.2** released with GPT-5.4/Gemini 3.1/Claude 4.6 model coverage, five-tier rating scale, OpenAI Responses API, Anthropic effort control, and cross-platform stability.
-- [2026-02] **TradingAgents v0.2.0** released with multi-provider LLM support (GPT-5.x, Gemini 3.x, Claude 4.x, Grok 4.x) and improved system architecture.
-- [2026-01] **Trading-R1** [Technical Report](https://arxiv.org/abs/2509.11420) released, with [Terminal](https://github.com/TauricResearch/Trading-R1) expected to land soon.
+## 更新动态
+- [2026-05] **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) 提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板，以及 CLI 中的流式报告展示。
+- [2026-04] **TradingAgents v0.2.4** 发布，新增结构化输出智能体（Research Manager、Trader、Portfolio Manager）、LangGraph 检查点恢复、持久化决策日志、DeepSeek/Qwen/GLM/Azure 供应商支持、Docker 支持，以及 Windows UTF-8 编码修复。完整更新列表见 [CHANGELOG.md](CHANGELOG.md)。
+- [2026-03] **TradingAgents v0.2.3** 发布，新增多语言支持、GPT-5.4 系列模型、统一模型目录、回测日期精度，以及代理支持。
+- [2026-03] **TradingAgents v0.2.2** 发布，新增 GPT-5.4/Gemini 3.1/Claude 4.6 模型覆盖、五级评级体系、OpenAI Responses API、Anthropic effort control，以及跨平台稳定性改进。
+- [2026-02] **TradingAgents v0.2.0** 发布，新增多供应商 LLM 支持（GPT-5.x、Gemini 3.x、Claude 4.x、Grok 4.x）和改进的系统架构。
+- [2026-01] **Trading-R1** [技术报告](https://arxiv.org/abs/2509.11420) 发布，[Terminal](https://github.com/TauricResearch/Trading-R1) 即将上线。
 
 <div align="center">
 <a href="https://www.star-history.com/#TauricResearch/TradingAgents&Date">
@@ -45,97 +45,97 @@
 </a>
 </div>
 
-> 🎉 **TradingAgents** officially released! We have received numerous inquiries about the work, and we would like to express our thanks for the enthusiasm in our community.
+> 🎉 **TradingAgents** 正式发布！我们收到了大量关于这项工作的咨询，感谢社区的广泛关注与热情。
 >
-> So we decided to fully open-source the framework. Looking forward to building impactful projects with you!
+> 因此我们决定将框架完全开源。期待与大家一起打造有影响力的项目！
 
 <div align="center">
 
-🚀 [TradingAgents](#tradingagents-framework) | ⚡ [Installation & CLI](#installation-and-cli) | 🎬 [Demo](https://www.youtube.com/watch?v=90gr5lwjIho) | 📦 [Package Usage](#tradingagents-package) | 🤝 [Contributing](#contributing) | 📄 [Citation](#citation)
+🚀 [TradingAgents 框架](#tradingagents-framework) | ⚡ [安装与 CLI](#installation-and-cli) | 🎬 [演示](https://www.youtube.com/watch?v=90gr5lwjIho) | 📦 [包使用](#tradingagents-package) | 🤝 [贡献](#contributing) | 📄 [引用](#citation)
 
 </div>
 
-## TradingAgents Framework
+## TradingAgents 框架
 
-TradingAgents is a multi-agent trading framework that mirrors the dynamics of real-world trading firms. By deploying specialized LLM-powered agents: from fundamental analysts, sentiment experts, and technical analysts, to trader, risk management team, the platform collaboratively evaluates market conditions and informs trading decisions. Moreover, these agents engage in dynamic discussions to pinpoint the optimal strategy.
+TradingAgents 是一个多智能体交易框架，模拟了真实交易公司的运作方式。通过部署专业化的 LLM 智能体，从基本面分析师、情绪专家、技术分析师，到交易员和风险管理团队，平台协同评估市场状况并指导交易决策。此外，这些智能体通过动态讨论来确定最优策略。
 
 <p align="center">
   <img src="assets/schema.png" style="width: 100%; height: auto;">
 </p>
 
-> TradingAgents framework is designed for research purposes. Trading performance may vary based on many factors, including the chosen backbone language models, model temperature, trading periods, the quality of data, and other non-deterministic factors. [It is not intended as financial, investment, or trading advice.](https://tauric.ai/disclaimer/)
+> TradingAgents 框架仅用于研究目的。交易表现可能因多种因素而异，包括所选的基础语言模型、模型温度、交易周期、数据质量以及其他非确定性因素。[本框架不构成金融、投资或交易建议。](https://tauric.ai/disclaimer/)
 
-Our framework decomposes complex trading tasks into specialized roles. This ensures the system achieves a robust, scalable approach to market analysis and decision-making.
+我们的框架将复杂的交易任务分解为专业化的角色。这确保了系统在市场分析和决策制定方面拥有稳健且可扩展的方法。
 
-### Analyst Team
-- Fundamentals Analyst: Evaluates company financials and performance metrics, identifying intrinsic values and potential red flags.
-- Sentiment Analyst: Analyzes social media and public sentiment using sentiment scoring algorithms to gauge short-term market mood.
-- News Analyst: Monitors global news and macroeconomic indicators, interpreting the impact of events on market conditions.
-- Technical Analyst: Utilizes technical indicators (like MACD and RSI) to detect trading patterns and forecast price movements.
+### 分析师团队
+- 基本面分析师：评估公司财务状况和业绩指标，识别内在价值和潜在风险信号。
+- 情绪分析师：使用情绪评分算法分析社交媒体和公众情绪，衡量短期市场情绪。
+- 新闻分析师：监控全球新闻和宏观经济指标，解读事件对市场状况的影响。
+- 技术分析师：运用技术指标（如 MACD 和 RSI）检测交易模式并预测价格走势。
 
 <p align="center">
   <img src="assets/analyst.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
 
-### Researcher Team
-- Comprises both bullish and bearish researchers who critically assess the insights provided by the Analyst Team. Through structured debates, they balance potential gains against inherent risks.
+### 研究员团队
+- 由看涨和看跌研究员组成，他们批判性地评估分析师团队提供的洞察。通过结构化的辩论，他们权衡潜在收益与固有风险。
 
 <p align="center">
   <img src="assets/researcher.png" width="70%" style="display: inline-block; margin: 0 2%;">
 </p>
 
-### Trader Agent
-- Composes reports from the analysts and researchers to make informed trading decisions. It determines the timing and magnitude of trades based on comprehensive market insights.
+### 交易智能体
+- 综合分析师和研究员的报告，做出明智的交易决策。它基于全面的市场洞察来确定交易的时机和规模。
 
 <p align="center">
   <img src="assets/trader.png" width="70%" style="display: inline-block; margin: 0 2%;">
 </p>
 
-### Risk Management and Portfolio Manager
-- Continuously evaluates portfolio risk by assessing market volatility, liquidity, and other risk factors. The risk management team evaluates and adjusts trading strategies, providing assessment reports to the Portfolio Manager for final decision.
-- The Portfolio Manager approves/rejects the transaction proposal. If approved, the order will be sent to the simulated exchange and executed.
+### 风险管理与投资组合经理
+- 通过评估市场波动性、流动性及其他风险因素，持续评估投资组合风险。风险管理团队评估并调整交易策略，向投资组合经理提供评估报告以供最终决策。
+- 投资组合经理批准或拒绝交易提案。如果批准，订单将发送到模拟交易所并执行。
 
 <p align="center">
   <img src="assets/risk.png" width="70%" style="display: inline-block; margin: 0 2%;">
 </p>
 
-## Installation and CLI
+## 安装与 CLI
 
-### Installation
+### 安装
 
-Clone TradingAgents:
+克隆 TradingAgents：
 ```bash
 git clone https://github.com/TauricResearch/TradingAgents.git
 cd TradingAgents
 ```
 
-Create a virtual environment in any of your favorite environment managers:
+在你喜欢的环境管理器中创建虚拟环境：
 ```bash
 conda create -n tradingagents python=3.13
 conda activate tradingagents
 ```
 
-Install the package and its dependencies:
+安装包及其依赖：
 ```bash
 pip install .
 ```
 
 ### Docker
 
-Alternatively, run with Docker:
+也可以使用 Docker 运行：
 ```bash
 cp .env.example .env  # add your API keys
 docker compose run --rm tradingagents
 ```
 
-For local models with Ollama:
+使用 Ollama 运行本地模型：
 ```bash
 docker compose --profile ollama run --rm tradingagents-ollama
 ```
 
-### Required APIs
+### API Key 配置
 
-TradingAgents supports multiple LLM providers. Set the API key for your chosen provider:
+TradingAgents 支持多个 LLM 供应商。设置你所选供应商的 API Key：
 
 ```bash
 export OPENAI_API_KEY=...          # OpenAI (GPT)
@@ -149,31 +149,31 @@ export OPENROUTER_API_KEY=...      # OpenRouter
 export ALPHA_VANTAGE_API_KEY=...   # Alpha Vantage
 ```
 
-For enterprise providers (e.g. Azure OpenAI, AWS Bedrock), copy `.env.enterprise.example` to `.env.enterprise` and fill in your credentials.
+对于企业级供应商（如 Azure OpenAI、AWS Bedrock），将 `.env.enterprise.example` 复制为 `.env.enterprise` 并填入你的凭证。
 
-For local models, configure Ollama with `llm_provider: "ollama"` in your config.
+对于本地模型，在配置中将 `llm_provider` 设置为 `"ollama"`。
 
-Alternatively, copy `.env.example` to `.env` and fill in your keys:
+或者，将 `.env.example` 复制为 `.env` 并填入你的 Key：
 ```bash
 cp .env.example .env
 ```
 
-### CLI Usage
+### CLI 使用
 
-Launch the interactive CLI:
+启动交互式 CLI：
 ```bash
 tradingagents          # installed command
 python -m cli.main     # alternative: run directly from source
 ```
-You will see a screen where you can select your desired tickers, analysis date, LLM provider, research depth, and more.
+你将看到一个界面，可以选择目标股票代码、分析日期、LLM 供应商、研究深度等。
 
-The CLI displays real-time progress with per-agent timing, streaming reports, and phase-level breakdowns in the footer.
+CLI 会实时显示进度，包括每个智能体的耗时统计、流式报告以及底部的阶段级别分解。
 
 <p align="center">
   <img src="assets/cli/cli_init.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
 
-An interface will appear showing results as they load, letting you track the agent's progress as it runs.
+界面会随着结果的加载实时展示，让你可以跟踪智能体的运行进度。
 
 <p align="center">
   <img src="assets/cli/cli_news.png" width="100%" style="display: inline-block; margin: 0 2%;">
@@ -183,18 +183,18 @@ An interface will appear showing results as they load, letting you track the age
   <img src="assets/cli/cli_transaction.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
 
-### A-Share Market Support
+### A 股市场支持
 
-TradingAgents supports **A-share (Chinese stock market) analysis** out of the box. Enter any Chinese ticker — bare 6-digit code (`000858`), exchange-suffixed (`000858.SZ`, `603208.SH`), or comma-separated list — and the framework automatically switches to tencent_sina (Tencent K-line + Sina quotes + East Money) and akshare (fundamentals, sentiment) data sources.
+TradingAgents 开箱即支持 **A 股（中国股票市场）分析**。输入任意中文股票代码，无论是纯 6 位数字（`000858`）、带交易所后缀（`000858.SZ`、`603208.SH`），还是逗号分隔的列表，框架都会自动切换到 tencent_sina（腾讯 K 线 + 新浪行情 + 东方财富）和 akshare（基本面、情绪）数据源。
 
 ```bash
-# Any of these work directly in the CLI:
+# 在 CLI 中直接输入以下任一格式即可：
 tradingagents         # then enter: 000858.SZ
 python -m cli.main    # then enter: 600519
 ```
 
 ```python
-# Or via the Python API:
+# 或通过 Python API：
 config = DEFAULT_CONFIG.copy()
 config["data_vendors"] = {
     "core_stock_apis": "tencent_sina",
@@ -206,39 +206,39 @@ ta = TradingAgentsGraph(config=config)
 _, decision = ta.propagate("000858.SZ", "2026-05-05")
 ```
 
-### OpenCLI Integration (Optional)
+### OpenCLI 集成（可选）
 
-Install [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) for 11 additional A-share data tools across three analysts:
+安装 [OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) 可获得 11 个额外的 A 股数据工具，覆盖三个分析师：
 
 ```bash
 npm install -g @jackwener/opencli
 ```
 
-| Tool | Data Source | Agent | Description |
+| Tool | Data Source | Agent | 说明 |
 |---|---|---|---|
-| `get_quote` | eastmoney quote | Market Analyst | Real-time quotes — PE, PB, market cap, turnover rate (16 fields) |
-| `get_kline` | eastmoney kline | Market Analyst | K-line history — configurable period (day/week/month/intraday) and price adjustment |
-| `get_money_flow` | eastmoney money-flow | Market Analyst | Main force capital flow — institutional net inflows/outflows |
-| `get_northbound` | eastmoney northbound | Market Analyst | Northbound capital — Shanghai/Shenzhen Connect foreign investor flow |
-| `get_sectors` | eastmoney sectors | Market Analyst | Sector rankings — industry/concept/region by various metrics |
-| `get_longhu` | eastmoney longhu | Market Analyst | Dragon-Tiger list — unusual institutional trading activity (with symbol filter) |
-| `get_hot_rank` | tdx hot-rank | Market Analyst | Hot stock search rankings — retail investor attention |
-| `get_index_board` | eastmoney index-board | Market Analyst | Market index board — CSI 300, SSE 50, Hang Seng, S&P 500 |
-| `get_kuaixun` | eastmoney kuaixun | Market + News | 7×24 financial news flashes — real-time market-moving events |
-| `get_holders` | eastmoney holders | Fundamentals Analyst | Top 10 institutional holders — position changes |
-| `get_announcement` | eastmoney announcement | News Analyst | Company announcements — official exchange disclosures |
+| `get_quote` | eastmoney quote | Market Analyst | 实时行情：PE、PB、总市值、换手率等 16 个字段 |
+| `get_kline` | eastmoney kline | Market Analyst | K 线历史：可配置周期（日/周/月/分钟）和复权方式 |
+| `get_money_flow` | eastmoney money-flow | Market Analyst | 主力资金流向：机构净流入/流出 |
+| `get_northbound` | eastmoney northbound | Market Analyst | 北向资金：沪港通/深港通外资流向 |
+| `get_sectors` | eastmoney sectors | Market Analyst | 板块排名：行业/概念/地区多维度排序 |
+| `get_longhu` | eastmoney longhu | Market Analyst | 龙虎榜：异常机构交易活动（支持股票代码过滤） |
+| `get_hot_rank` | tdx hot-rank | Market Analyst | 热门搜索排行：散户关注度 |
+| `get_index_board` | eastmoney index-board | Market Analyst | 指数面板：沪深 300、上证 50、恒生、标普 500 |
+| `get_kuaixun` | eastmoney kuaixun | Market + News | 7×24 财经快讯：实时市场动态 |
+| `get_holders` | eastmoney holders | Fundamentals Analyst | 前十大机构持仓：仓位变动 |
+| `get_announcement` | eastmoney announcement | News Analyst | 公司公告：交易所官方披露 |
 
-All 11 tools are automatically activated when analyzing A-share tickers (Chinese stock codes). They are silently skipped if OpenCLI is not installed. No configuration needed beyond the `npm install`.
+分析 A 股股票代码时，11 个工具会自动激活。如果未安装 OpenCLI，它们会被静默跳过。除了 `npm install` 之外，无需任何额外配置。
 
-## TradingAgents Package
+## TradingAgents 包
 
-### Implementation Details
+### 实现细节
 
-We built TradingAgents with LangGraph to ensure flexibility and modularity. The framework supports multiple LLM providers: OpenAI, Google, Anthropic, xAI, DeepSeek, Qwen (Alibaba DashScope), GLM (Zhipu), OpenRouter, Ollama for local models, and Azure OpenAI for enterprise.
+我们基于 LangGraph 构建 TradingAgents，以确保灵活性和模块化。框架支持多个 LLM 供应商：OpenAI、Google、Anthropic、xAI、DeepSeek、Qwen（阿里 DashScope）、GLM（智谱）、OpenRouter、Ollama（本地模型），以及 Azure OpenAI（企业级）。
 
-### Python Usage
+### Python 使用
 
-To use TradingAgents inside your code, you can import the `tradingagents` module and initialize a `TradingAgentsGraph()` object. The `.propagate()` function will return a decision. You can run `main.py`, here's also a quick example:
+要在代码中使用 TradingAgents，你可以导入 `tradingagents` 模块并初始化一个 `TradingAgentsGraph()` 对象。`.propagate()` 函数将返回一个决策结果。你可以运行 `main.py`，这里也有一个简单的示例：
 
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -246,12 +246,12 @@ from tradingagents.default_config import DEFAULT_CONFIG
 
 ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
 
-# forward propagate
+# 前向传播
 _, decision = ta.propagate("NVDA", "2026-01-15")
 print(decision)
 ```
 
-You can also adjust the default configuration to set your own choice of LLMs, debate rounds, etc.
+你还可以调整默认配置来设置自己选择的 LLM、辩论轮数等。
 
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -259,8 +259,8 @@ from tradingagents.default_config import DEFAULT_CONFIG
 
 config = DEFAULT_CONFIG.copy()
 config["llm_provider"] = "openai"        # openai, google, anthropic, xai, deepseek, qwen, glm, openrouter, ollama, azure
-config["deep_think_llm"] = "gpt-5.4"     # Model for complex reasoning
-config["quick_think_llm"] = "gpt-5.4-mini" # Model for quick tasks
+config["deep_think_llm"] = "gpt-5.4"     # 用于复杂推理的模型
+config["quick_think_llm"] = "gpt-5.4-mini" # 用于快速任务的模型
 config["max_debate_rounds"] = 2
 
 ta = TradingAgentsGraph(debug=True, config=config)
@@ -268,27 +268,27 @@ _, decision = ta.propagate("NVDA", "2026-01-15")
 print(decision)
 ```
 
-See `tradingagents/default_config.py` for all configuration options.
+查看 `tradingagents/default_config.py` 了解所有配置选项。
 
-## Persistence and Recovery
+## 持久化与恢复
 
-TradingAgents persists two kinds of state across runs.
+TradingAgents 在运行之间持久化两种状态。
 
-### Decision log
+### 决策日志
 
-The decision log is always on. Each completed run appends its decision to `~/.tradingagents/memory/trading_memory.md`. On the next run for the same ticker, TradingAgents fetches the realised return (raw and alpha vs SPY), generates a one-paragraph reflection, and injects the most recent same-ticker decisions plus recent cross-ticker lessons into the Portfolio Manager prompt, so each analysis carries forward what worked and what didn't.
+决策日志始终开启。每次完成的运行会将其决策追加到 `~/.tradingagents/memory/trading_memory.md`。在下一次分析同一股票代码时，TradingAgents 会获取已实现收益（原始收益和相对 SPY 的超额收益），生成一段反思总结，并将最近的同代码决策和跨代码经验教训注入到投资组合经理的提示中，确保每次分析都能延续之前的经验。
 
-Override the path with `TRADINGAGENTS_MEMORY_LOG_PATH`.
+可通过 `TRADINGAGENTS_MEMORY_LOG_PATH` 覆盖路径。
 
-### Checkpoint resume
+### 检查点恢复
 
-Checkpoint resume is opt-in via `--checkpoint`. When enabled, LangGraph saves state after each node so a crashed or interrupted run resumes from the last successful step instead of starting over. On a resume run you will see `Resuming from step N for <TICKER> on <date>` in the logs; on a new run you will see `Starting fresh`. Checkpoints are cleared automatically on successful completion.
+检查点恢复通过 `--checkpoint` 参数启用。启用后，LangGraph 在每个节点之后保存状态，这样崩溃或中断的运行可以从最后一个成功的步骤恢复，而不需要重新开始。在恢复运行时，你会在日志中看到 `Resuming from step N for <TICKER> on <date>`；在新运行时，你会看到 `Starting fresh`。成功完成后检查点会自动清除。
 
-Per-ticker SQLite databases live at `~/.tradingagents/cache/checkpoints/<TICKER>.db` (override the base with `TRADINGAGENTS_CACHE_DIR`). Use `--clear-checkpoints` to reset all of them before a run.
+每个股票代码的 SQLite 数据库存储在 `~/.tradingagents/cache/checkpoints/<TICKER>.db`（可通过 `TRADINGAGENTS_CACHE_DIR` 覆盖基础目录）。使用 `--clear-checkpoints` 可以在运行前重置所有检查点。
 
 ```bash
-tradingagents analyze --checkpoint           # enable for this run
-tradingagents analyze --clear-checkpoints    # reset before running
+tradingagents analyze --checkpoint           # 本次运行启用检查点
+tradingagents analyze --clear-checkpoints    # 运行前重置检查点
 ```
 
 ```python
@@ -298,15 +298,15 @@ ta = TradingAgentsGraph(config=config)
 _, decision = ta.propagate("NVDA", "2026-01-15")
 ```
 
-## Contributing
+## 贡献
 
-We welcome contributions from the community! Whether it's fixing a bug, improving documentation, or suggesting a new feature, your input helps make this project better. If you are interested in this line of research, please consider joining our open-source financial AI research community [Tauric Research](https://tauric.ai/).
+我们欢迎社区贡献！无论是修复 Bug、改进文档，还是提出新功能建议，你的参与都能让这个项目变得更好。如果你对这个研究方向感兴趣，欢迎加入我们的开源金融 AI 研究社区 [Tauric Research](https://tauric.ai/)。
 
-Past contributions, including code, design feedback, and bug reports, are credited per release in [`CHANGELOG.md`](CHANGELOG.md).
+以往的贡献，包括代码、设计反馈和 Bug 报告，均在 [`CHANGELOG.md`](CHANGELOG.md) 中按版本记录致谢。
 
-## Citation
+## 引用
 
-Please reference our work if you find *TradingAgents* provides you with some help :)
+如果你发现 *TradingAgents* 对你有帮助，请引用我们的工作 :)
 
 ```
 @misc{xiao2025tradingagentsmultiagentsllmfinancial,
