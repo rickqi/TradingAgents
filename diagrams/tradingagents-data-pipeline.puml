@@ -1,0 +1,107 @@
+@startuml tradingagents-data-pipeline
+left to right direction
+
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam component {
+    BackgroundColor #F8F9FA
+    BorderColor #DEE2E6
+    RoundCorner 15
+    FontSize 11
+}
+
+package "数据源层" as src_layer #E3F2FD {
+    component [yfinance\n美股/全球数据] as yf #BBDEFB
+    component [Alpha Vantage\n多市场数据] as av #BBDEFB
+    component [腾讯/新浪\nA 股行情] as ts #BBDEFB
+    component [AKShare\nA 股基本面] as ak #BBDEFB
+    component [OpenCLI\n11 个数据工具] as oc #BBDEFB
+}
+
+package "供应商路由层" as route_layer #FFF3E0 {
+    component [config.py\nset_config()] as cfg #FFE0B2
+    component [interface.py\nroute_to_vendor()] as router #FFCC80
+    component [VENDOR_METHODS\n10 方法 x 4 供应商] as methods #FFE0B2
+}
+
+package "数据工具层" as tool_layer #E8F5E9 {
+    component [get_stock_data\nget_indicators] as tools_core #C8E6C9
+    component [get_fundamentals\nbalance/cashflow/income] as tools_fund #C8E6C9
+    component [get_news\nget_global_news] as tools_news #C8E6C9
+    component [get_sentiment\nget_insider_transactions] as tools_sent #C8E6C9
+}
+
+package "分析师团队\n(quick_think_llm)" as analyst_layer #F3E5F5 {
+    component [市场分析师\nMarket Analyst] as market #E1BEE7
+    component [情绪分析师\nSocial Analyst] as social #E1BEE7
+    component [新闻分析师\nNews Analyst] as news_a #E1BEE7
+    component [基本面分析师\nFundamentals] as fund #E1BEE7
+}
+
+package "研究决策层" as decision_layer #FFEBEE {
+    component [看多/看空辩论\nBull vs Bear] as debate #FFCDD2
+    component [Research Manager\n结构化输出\ndeep_think_llm] as rm #EF9A9A
+    component [Trader\nBuy/Hold/Sell\nstructured] as trader #FFCDD2
+    component [风险辩论\nAggressive/Conservative/Neutral] as risk #FFCDD2
+    component [Portfolio Manager\n5 级评级\ndeep_think_llm] as pm #EF9A9A
+}
+
+package "输出与持久化" as output_layer #E0F7FA {
+    component [决策日志\ntrading_memory.md] as memlog #B2EBF2
+    component [SQLite 检查点\n断点续跑] as checkpoint #B2EBF2
+    component [分析报告\nMD / DOCX] as report #B2EBF2
+}
+
+yf --> router
+av --> router
+ts --> router
+ak --> router
+oc --> router
+
+cfg --> router
+methods --> router
+
+router --> tools_core
+router --> tools_fund
+router --> tools_news
+router --> tools_sent
+
+tools_core --> market
+tools_sent --> social
+tools_news --> news_a
+tools_fund --> fund
+
+market --> debate
+social --> debate
+news_a --> debate
+fund --> debate
+debate --> rm
+rm --> trader
+trader --> risk
+risk --> pm
+pm --> memlog
+pm --> report
+
+memlog ..> pm : "历史反思"
+
+note bottom of router
+  **降级链**
+  tencent_sina,akshare
+  先尝试 tencent_sina
+  失败则回退 akshare
+  A 股模式自动排除
+  yfinance / alpha_vantage
+end note
+
+note top of rm
+  **双 LLM 模式**
+  deep_think_llm:
+    Research Manager
+    Portfolio Manager
+  quick_think_llm:
+    分析师 + 辩论 + Trader
+end note
+
+@enduml
