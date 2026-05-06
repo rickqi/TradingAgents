@@ -28,6 +28,11 @@ _DEFAULT_CONFIG_TEMPLATE = {
     "google_thinking_level": None,      # "high", "minimal", etc.
     "openai_reasoning_effort": None,    # "medium", "high", "low"
     "anthropic_effort": None,           # "high", "medium", "low"
+    # LLM HTTP timeout / retry — prevents indefinite hang on network issues.
+    # timeout: seconds before raising ConnectTimeout/ReadTimeout (default: 120).
+    # max_retries: number of retries on transient failures (default: 2).
+    "llm_timeout": 120,
+    "llm_max_retries": 2,
     # Checkpoint/resume: when True, LangGraph saves state after each node
     # so a crashed run can resume from the last successful step.
     "checkpoint_enabled": False,

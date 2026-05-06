@@ -140,6 +140,14 @@ class TradingAgentsGraph:
         kwargs = {}
         provider = self.config.get("llm_provider", "").lower()
 
+        # Universal timeout / retry — prevents indefinite hang on network issues
+        timeout = self.config.get("llm_timeout")
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        max_retries = self.config.get("llm_max_retries")
+        if max_retries is not None:
+            kwargs["max_retries"] = max_retries
+
         if provider == "google":
             thinking_level = self.config.get("google_thinking_level")
             if thinking_level:

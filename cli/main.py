@@ -58,6 +58,11 @@ def main(
         "--clear-checkpoints",
         help="Delete all saved checkpoints before running (force fresh start).",
     ),
+    diag: bool = typer.Option(
+        False,
+        "--diag",
+        help="Enable diagnostic mode: write detailed execution trace to .cli_diag.log for debugging.",
+    ),
 ):
     """TradingAgents CLI: Multi-Agents LLM Financial Trading Framework"""
     if ctx.invoked_subcommand is not None:
@@ -66,7 +71,7 @@ def main(
         from tradingagents.graph.checkpointer import clear_all_checkpoints
         n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
         console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
-    run_analysis(checkpoint=checkpoint)
+    run_analysis(checkpoint=checkpoint, diag=diag)
 
 
 # Create a deque to store recent messages with a maximum length
@@ -1408,7 +1413,7 @@ def _show_opencli_summary(ticker: str):
     ))
 
 
-def run_analysis(checkpoint: bool = False):
+def run_analysis(checkpoint: bool = False, diag: bool = False):
     # First get all user selections
     selections = get_user_selections()
 
@@ -1539,15 +1544,20 @@ def run_analysis(checkpoint: bool = False):
     layout = create_layout()
 
     # Crash diagnostic log — write to file to survive Live swallowing output
+    # Enabled only with --diag flag; otherwise _diag is a silent no-op.
     _diag_log = _CLI_ROOT / ".cli_diag.log"
 
-    def _diag(msg):
-        with open(_diag_log, "a", encoding="utf-8") as _f:
-            _f.write(f"{datetime.datetime.now().strftime('%H:%M:%S.%f')} {msg}\n")
+    if diag:
+        def _diag(msg):
+            with open(_diag_log, "a", encoding="utf-8") as _f:
+                _f.write(f"{datetime.datetime.now().strftime('%H:%M:%S.%f')} {msg}\n")
 
-    # Clear previous log
-    with open(_diag_log, "w", encoding="utf-8") as _f:
-        _f.write("")
+        # Clear previous log
+        with open(_diag_log, "w", encoding="utf-8") as _f:
+            _f.write("")
+    else:
+        def _diag(msg):
+            pass
 
     _diag("Entering Live context")
 
@@ -1594,10 +1604,9 @@ def run_analysis(checkpoint: bool = False):
         graph._resolve_pending_entries(selections["ticker"])
         _diag("Auto detect vendor done")
 
-        # Diagnostic: show active data vendor config
+        # Diagnostic: log active data vendor config
         from tradingagents.dataflows.config import get_config as get_df_config
         active_vendors = get_df_config().get("data_vendors", {})
-        console.print(f"[dim]Active data_vendors: {active_vendors}[/dim]")
         _diag(f"Active vendors: {active_vendors}")
 
         init_agent_state = graph.propagator.create_initial_state(
