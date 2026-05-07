@@ -540,7 +540,16 @@ class TradingAgentsGraph:
 
         # Save to file. Reject ticker values that would escape the
         # results directory when joined as a path component.
-        safe_ticker = safe_ticker_component(self.ticker)
+        import hashlib as _hashlib
+        try:
+            safe_ticker = safe_ticker_component(self.ticker)
+        except ValueError:
+            # Long multi-ticker input: truncate + hash to fit Windows MAX_PATH
+            raw = self.ticker.replace("/", "_").replace("\\", "_")
+            parts = raw.split(",")
+            head = "_".join(p.strip() for p in parts[:3])
+            digest = _hashlib.md5(raw.encode()).hexdigest()[:8]
+            safe_ticker = f"{head}_etc_{digest}"
         directory = Path(self.config["results_dir"]) / safe_ticker / "TradingAgentsStrategy_logs"
         directory.mkdir(parents=True, exist_ok=True)
 

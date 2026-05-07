@@ -1720,12 +1720,22 @@ def run_analysis(checkpoint: bool = False, diag: bool = False, cli_overrides: di
     # Create result directory — sanitize ticker so characters like '/' don't
     # create unintended sub-directories (e.g. "601318.SH/02318.HK").
     from tradingagents.dataflows.utils import safe_ticker_component
+    import hashlib
     safe_ticker = selections["ticker"].replace("/", "_").replace("\\", "_")
     try:
         safe_ticker = safe_ticker_component(safe_ticker)
     except ValueError:
         # Fallback: slugify anything non-safe to underscore
         safe_ticker = re.sub(r"[^A-Za-z0-9._\-\^]", "_", selections["ticker"])
+
+    # Windows MAX_PATH = 260; base path + date + separators already use ~100 chars.
+    # Keep the ticker component under 64 chars to stay safe.  For long multi-ticker
+    # inputs, truncate to the first 3 tickers and append a short hash.
+    if len(safe_ticker) > 64:
+        parts = safe_ticker.split("_")
+        head = "_".join(parts[:3])
+        digest = hashlib.md5(safe_ticker.encode()).hexdigest()[:8]
+        safe_ticker = f"{head}_etc_{digest}"
 
     results_dir = Path(config["results_dir"]) / safe_ticker / selections["analysis_date"]
     results_dir.mkdir(parents=True, exist_ok=True)
