@@ -57,6 +57,17 @@ from .opencli_vendor import (
     get_longhu as opencli_get_longhu,
     get_hot_rank as opencli_get_hot_rank,
 )
+from .twelve_data import (
+    get_stock_data as get_twelve_data_stock,
+    get_indicators as get_twelve_data_indicator,
+    get_fundamentals as get_twelve_data_fundamentals,
+    get_balance_sheet as get_twelve_data_balance_sheet,
+    get_cashflow as get_twelve_data_cashflow,
+    get_income_statement as get_twelve_data_income_statement,
+    get_news as get_twelve_data_news,
+    get_global_news as get_twelve_data_global_news,
+    get_insider_transactions as get_twelve_data_insider_transactions,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -116,6 +127,7 @@ VENDOR_LIST = [
     "tencent_sina",
     "akshare",
     "opencli",
+    "twelve_data",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -126,6 +138,7 @@ VENDOR_METHODS = {
         "yfinance": get_YFin_data_online,
         "tencent_sina": get_tencent_stock,
         "akshare": get_akshare_stock,
+        "twelve_data": get_twelve_data_stock,
     },
     # technical_indicators
     "get_indicators": {
@@ -133,6 +146,7 @@ VENDOR_METHODS = {
         "yfinance": get_stock_stats_indicators_window,
         "tencent_sina": get_tencent_indicator,
         "akshare": get_akshare_indicator,
+        "twelve_data": get_twelve_data_indicator,
     },
     # fundamental_data
     "get_fundamentals": {
@@ -140,41 +154,48 @@ VENDOR_METHODS = {
         "yfinance": get_yfinance_fundamentals,
         "tencent_sina": get_tencent_fundamentals,
         "akshare": get_akshare_fundamentals,
+        "twelve_data": get_twelve_data_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
         "tencent_sina": get_tencent_balance_sheet,
         "akshare": get_akshare_balance_sheet,
+        "twelve_data": get_twelve_data_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
         "tencent_sina": get_tencent_cashflow,
         "akshare": get_akshare_cashflow,
+        "twelve_data": get_twelve_data_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
         "tencent_sina": get_tencent_income_statement,
         "akshare": get_akshare_income_statement,
+        "twelve_data": get_twelve_data_income_statement,
     },
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
         "tencent_sina": get_tencent_news,
+        "twelve_data": get_twelve_data_news,
     },
     "get_global_news": {
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
         "tencent_sina": get_tencent_global_news,
+        "twelve_data": get_twelve_data_global_news,
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
         "tencent_sina": get_tencent_insider_transactions,
         "akshare": get_akshare_insider_transactions,
+        "twelve_data": get_twelve_data_insider_transactions,
     },
     # sentiment_data
     "get_sentiment": {
@@ -240,7 +261,7 @@ def route_to_vendor(method: str, *args, **kwargs):
     #   normalize ticker 'NVDA' to a stock code"), wasting cooldown time and
     #   producing confusing error messages in the TUI.
     _CHINESE_VENDORS = {"tencent_sina", "akshare"}
-    _WESTERN_VENDORS = {"yfinance", "alpha_vantage"}
+    _WESTERN_VENDORS = {"yfinance", "alpha_vantage", "twelve_data"}
     is_chinese_mode = any(v in _CHINESE_VENDORS for v in primary_vendors)
 
     all_available_vendors = list(VENDOR_METHODS[method].keys())

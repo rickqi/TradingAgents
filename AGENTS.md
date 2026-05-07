@@ -33,6 +33,7 @@ DASHSCOPE_API_KEY=...        # Qwen（阿里）
 ZHIPU_API_KEY=...             # GLM（智谱）
 OPENROUTER_API_KEY=...
 ALPHA_VANTAGE_API_KEY=...     # 可选，alpha_vantage 数据源
+TWELVE_DATA_API_KEY=...       # 可选，twelve_data 数据源（REST API，无需额外 pip 依赖）
 ```
 
 企业版（Azure OpenAI）：复制 `.env.enterprise.example` → `.env.enterprise`。
@@ -125,6 +126,7 @@ tradingagents/
 │   ├── yfinance_news.py
 │   ├── tencent_sina.py   # A 股：腾讯 K 线 + 新浪行情 + 东方财富 API
 │   ├── akshare_vendor.py # A 股：AKShare — 内幕交易、情绪、个股财报
+│   ├── twelve_data.py    # Twelve Data — REST API，9 个方法（无需额外 pip 依赖）
 │   └── alpha_vantage*.py # Alpha Vantage 实现
 ├── llm_clients/       # 多供应商 LLM 抽象层 → 详见 tradingagents/llm_clients/AGENTS.md
 │   ├── factory.py     # create_llm_client() — 懒加载
@@ -188,14 +190,14 @@ scripts/               # 用户分析工具（不是 Python 包，无 __init__.p
 | `max_recur_limit` | `250` | LangGraph 递归限制 |
 | `checkpoint_enabled` | `False` | 每个节点后 SQLite 断点保存 |
 | `output_language` | `"English"` | 报告语言（内部辩论保持英文） |
-| `data_vendors` | 各项 `"yfinance"` | 按类别覆盖。选项：`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`。支持逗号分隔降级链。`sentiment_data` 默认 `"akshare"`，`opencli_market` 默认 `"opencli"`。 |
+| `data_vendors` | 各项 `"yfinance"` | 按类别覆盖。选项：`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`, `twelve_data`。支持逗号分隔降级链。`sentiment_data` 默认 `"akshare"`，`opencli_market` 默认 `"opencli"`。 |
 | `tool_vendors` | `{}` | 按工具覆盖，优先级高于 `data_vendors` |
 
 环境变量覆盖：`TRADINGAGENTS_RESULTS_DIR`, `TRADINGAGENTS_CACHE_DIR`, `TRADINGAGENTS_MEMORY_LOG_PATH`。
 
 ## 数据供应商
 
-4 个供应商（`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`），覆盖 10 个工具方法。支持逗号分隔降级链（如 `"tencent_sina,akshare"`）。`sentiment_data` 类别（仅 akshare）通过 `get_sentiment` 提供量化情绪分数。详见 `tradingagents/dataflows/AGENTS.md`。
+5 个供应商（`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`, `twelve_data`），覆盖 10 个工具方法。支持逗号分隔降级链（如 `"tencent_sina,akshare"` 或 `"twelve_data,yfinance"`）。`twelve_data` 使用 REST API（`requests`），无需额外 pip 依赖，免费版有 8 API credits/分钟限制。`sentiment_data` 类别（仅 akshare）通过 `get_sentiment` 提供量化情绪分数。详见 `tradingagents/dataflows/AGENTS.md`。
 
 ## DeepSeek 模型说明
 

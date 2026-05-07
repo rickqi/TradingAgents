@@ -1,6 +1,6 @@
 # AGENTS.md — tradingagents/dataflows
 
-市场数据抽象层。将 10 个工具方法路由到 4 个数据供应商，支持降级链。
+市场数据抽象层。将 10 个工具方法路由到 5 个数据供应商，支持降级链。
 
 ## 目录结构
 
@@ -17,6 +17,7 @@ dataflows/
 ├── alpha_vantage_*.py      # Alpha Vantage: 股票行情, 技术指标, 基本面, 新闻
 ├── tencent_sina.py         # A 股: 腾讯 K 线 + 新浪行情 + 东方财富 API
 ├── akshare_vendor.py       # A 股: AKShare — 内幕交易, 情绪, 个股财报
+├── twelve_data.py          # Twelve Data — REST API，9 个方法（无需额外 pip 依赖）
 └── opencli_vendor.py       # A 股: OpenCLI — 11 个 A 股数据函数 + 1 个加密货币函数（可选）
 ```
 
@@ -44,10 +45,10 @@ dataflows/
 
 | 方法 | 类别 | 供应商 |
 |--------|----------|---------|
-| `get_stock_data` | core_stock_apis | yfinance, alpha_vantage, tencent_sina, akshare |
-| `get_indicators` | technical_indicators | yfinance, alpha_vantage, tencent_sina, akshare |
-| `get_fundamentals`, `get_balance_sheet`, `get_cashflow`, `get_income_statement` | fundamental_data | yfinance, alpha_vantage, tencent_sina, akshare |
-| `get_news`, `get_global_news`, `get_insider_transactions` | news_data | yfinance, alpha_vantage, tencent_sina（akshare 仅支持 insider_transactions） |
+| `get_stock_data` | core_stock_apis | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data |
+| `get_indicators` | technical_indicators | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data |
+| `get_fundamentals`, `get_balance_sheet`, `get_cashflow`, `get_income_statement` | fundamental_data | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data |
+| `get_news`, `get_global_news`, `get_insider_transactions` | news_data | yfinance, alpha_vantage, tencent_sina, twelve_data（akshare 仅支持 insider_transactions） |
 | `get_sentiment` | sentiment_data | 仅 akshare |
 
 ## 新增供应商
@@ -87,6 +88,19 @@ dataflows/
 - `get_news` / `get_global_news`：未实现（`stock_news_em()` 存在 pandas 3.0+pyarrow 兼容性问题）
 - 所有方法包含 `_MAX_ROWS = 500` 截断，对大数据集会附加摘要行
 - 自动纳入 A 股降级链：`fundamental_data: "tencent_sina,akshare"`，`sentiment_data: "akshare"`
+
+## twelve_data 特性（REST API 供应商）
+
+- 纯 REST API（`requests`），**无需额外 pip 依赖**（不使用 `twelvedata` Python SDK）
+- API Key 通过环境变量 `TWELVE_DATA_API_KEY` 获取
+- **9 个方法**全部注册到 `VENDOR_METHODS`，与 yfinance/alpha_vantage 签名兼容
+- 属于 `_WESTERN_VENDORS`，A 股模式下自动排除
+- 免费版限制：8 API credits/分钟，800 credits/天
+- **免费版可用**：`get_stock_data`（OHLCV）、`get_indicators`（12 种技术指标）、`get_income_statement`、`get_cashflow`
+- **免费版受限**：`get_fundamentals`（404）、`get_news`（404）、`get_insider_transactions`（需 Pro 计划）
+- 错误处理：所有方法 try/except 包裹，失败时返回错误字符串（不抛异常），允许降级链尝试下一个供应商
+- 技术指标名必须小写：`rsi`, `macd`, `close_50_sma`, `close_200_sma`, `boll` 等（完整列表见 `_INDICATOR_CONFIG`）
+- Ticker 格式：不带交易所后缀（`AAPL`，不是 `AAPL.US`）
 
 ## 配置单例
 

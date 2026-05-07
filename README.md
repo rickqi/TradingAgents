@@ -29,7 +29,7 @@
 
 ## 更新动态
 
-- [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。
+- [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加 [Twelve Data](https://twelvedata.com/)（REST API，无需额外依赖）作为第 5 个数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。
 
   ![1778045286797.png](assets/README/1778045286797.png)
 
@@ -161,6 +161,7 @@ export DASHSCOPE_API_KEY=...       # Qwen (Alibaba DashScope)
 export ZHIPU_API_KEY=...           # GLM (Zhipu)
 export OPENROUTER_API_KEY=...      # OpenRouter
 export ALPHA_VANTAGE_API_KEY=...   # Alpha Vantage
+export TWELVE_DATA_API_KEY=...    # Twelve Data（可选，REST API 数据源）
 ```
 
 对于企业级供应商（如 Azure OpenAI、AWS Bedrock），将 `.env.enterprise.example` 复制为 `.env.enterprise` 并填入你的凭证。
@@ -420,16 +421,25 @@ config["max_recur_limit"] = 250         # LangGraph 递归限制（默认 250）
 
 #### 数据供应商配置
 
-支持 4 个数据供应商（`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`），按类别配置，支持逗号分隔的降级链：
+支持 5 个数据供应商（`yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`, `twelve_data`），按类别配置，支持逗号分隔的降级链：
 
 ```python
 # 美股默认配置
 config["data_vendors"] = {
-    "core_stock_apis": "yfinance",          # 也可以用 alpha_vantage
+    "core_stock_apis": "yfinance",          # 也可以用 alpha_vantage 或 twelve_data
     "technical_indicators": "yfinance",
     "fundamental_data": "yfinance",
     "news_data": "yfinance",
     "sentiment_data": "akshare",            # 仅 akshare 支持
+}
+
+# 使用 Twelve Data 作为主力数据源（REST API，免费版 8 credits/分钟）
+config["data_vendors"] = {
+    "core_stock_apis": "twelve_data,yfinance",  # 降级链
+    "technical_indicators": "twelve_data,yfinance",
+    "fundamental_data": "twelve_data,yfinance",
+    "news_data": "yfinance",
+    "sentiment_data": "akshare",
 }
 
 # A 股配置（自动检测中文股票代码时也会自动切换）
