@@ -2332,5 +2332,125 @@ def report(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def qlib(
+    action: str = typer.Argument(
+        ...,
+        help="操作: convert (OHLCV缓存→Qlib二进制), backfill-signals (JSON日志→信号文件), scan (扫描缓存)",
+    ),
+    ticker: Optional[str] = typer.Option(
+        None, "--ticker", "-t",
+        help="指定股票代码（不指定则处理全部缓存）",
+    ),
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o",
+        help="输出目录（默认: ~/.qlib/qlib_data/tradingagents）",
+    ),
+    with_signals: bool = typer.Option(
+        False, "--with-signals",
+        help="convert 时同时合并 AI 分析信号",
+    ),
+    freq: str = typer.Option(
+        "day", "--freq",
+        help="数据频率: day",
+    ),
+):
+    """Qlib 数据转换与信号提取。
+
+    示例:
+      tradingagents qlib scan                             # 查看缓存状态
+      tradingagents qlib convert                         # 全部缓存 → Qlib 二进制
+      tradingagents qlib convert -t 000858.SZ            # 单只股票
+      tradingagents qlib convert --with-signals          # 含 AI 信号
+      tradingagents qlib backfill-signals                # JSON 日志 → 信号文件
+    """
+    try:
+        if action == "scan":
+            from tradingagents.qlib.cache_scanner import scan_cache, print_scan_summary
+
+            cached = scan_cache()
+            if ticker:
+                from tradingagents.qlib.cache_scanner import scan_cache_for_tickers
+                cached = scan_cache_for_tickers([t.strip() for t in ticker.split(",")])
+            if not cached:
+                console.print("[yellow]No cached OHLCV files found.[/yellow]")
+                return
+            print_scan_summary(cached)
+
+        elif action == "convert":
+            from tradingagents.qlib.converter import QlibConverter
+            from tradingagents.qlib.signal_extractor import batch_extract_from_logs
+
+            qlib_dir = output or str(Path.home() / ".qlib" / "qlib_data" / "tradingagents")
+            console.print("[cyan]Converting cached OHLCV data to Qlib binary format...[/cyan]")
+
+            extra_features = None
+            if with_signals:
+                signals_df = batch_extract_from_logs()
+                if signals_df is not None and not signals_df.empty:
+                    extra_features = {}
+                    for symbol, group in signals_df.groupby("symbol"):
+                        extra_features[symbol] = group.drop(columns=["symbol"])
+                    console.print(f"[green]Found {len(signals_df)} signal records for {len(extra_features)} instruments.[/green]")
+                else:
+                    console.print("[yellow]No signal records found. Converting without signals.[/yellow]")
+
+            converter = QlibConverter(qlib_dir, freq=freq)
+            tickers = None
+            if ticker:
+                tickers = [t.strip() for t in ticker.split(",") if t.strip()]
+
+            result = converter.convert_from_cache(
+                tickers=tickers,
+                extra_features=extra_features,
+            )
+
+            # Print result summary using Rich Table
+            table = Table(
+                title="Qlib 转换结果",
+                show_header=True,
+                header_style="bold magenta",
+                box=box.ROUNDED,
+            )
+            table.add_column("指标", justify="left")
+            table.add_column("值", justify="left")
+
+            table.add_row("标的数量", str(result.num_instruments))
+            table.add_row("特征数量", str(result.num_features))
+            table.add_row("交易日历天数", str(result.num_calendar_days))
+            table.add_row("日期范围", f"{result.date_range[0]} ~ {result.date_range[1]}")
+            table.add_row("特征列表", ", ".join(result.feature_names))
+            table.add_row("输出目录", result.qlib_dir)
+
+            console.print(table)
+            console.print("[green]转换完成！[/green]")
+
+        elif action == "backfill-signals":
+            from tradingagents.qlib.signal_extractor import batch_extract_from_logs, save_signals_parquet
+
+            signals_df = batch_extract_from_logs()
+            if signals_df is None or signals_df.empty:
+                console.print("[yellow]No signal records found in analysis logs.[/yellow]")
+                return
+
+            console.print(f"[green]Found {len(signals_df)} signal records.[/green]")
+            output_path = output or str(
+                Path.home() / ".qlib" / "qlib_data" / "tradingagents_signals.parquet"
+            )
+            save_signals_parquet(signals_df, output_path)
+            console.print(f"[green]信号文件已保存:[/green] {output_path}")
+
+        else:
+            console.print(f"[red]Unknown action: {action}[/red]")
+            console.print("[dim]Valid actions: scan, convert, backfill-signals[/dim]")
+            raise typer.Exit(code=1)
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()

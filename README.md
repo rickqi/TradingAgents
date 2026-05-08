@@ -29,16 +29,27 @@
 
 ## 更新动态
 
-- [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加twelve data 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。
+* [2026-05] 增加支持股票数据映射QLIB数据转换功能
+* [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加twelve data 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。
 
-  ![1778045286797.png](assets/README/1778045286797.png)
+![1778045286797.png](assets/README/1778045286797.png)
 
-  ![1778045422170.png](assets/README/1778045422170.png) ![1778045422167.png](assets/README/1778045422167.png) ![1778045422168.png](assets/README/1778045422168.png) ![1778045422169.png](assets/README/1778045422169.png)
-- [2026-04] **TradingAgents v0.2.4** 发布，新增结构化输出智能体（Research Manager、Trader、Portfolio Manager）、LangGraph 检查点恢复、持久化决策日志、DeepSeek/Qwen/GLM/Azure 供应商支持、Docker 支持，以及 Windows UTF-8 编码修复。完整更新列表见 [CHANGELOG.md](CHANGELOG.md)。
-- [2026-03] **TradingAgents v0.2.3** 发布，新增多语言支持、GPT-5.4 系列模型、统一模型目录、回测日期精度，以及代理支持。
-- [2026-03] **TradingAgents v0.2.2** 发布，新增 GPT-5.4/Gemini 3.1/Claude 4.6 模型覆盖、五级评级体系、OpenAI Responses API、Anthropic effort control，以及跨平台稳定性改进。
-- [2026-02] **TradingAgents v0.2.0** 发布，新增多供应商 LLM 支持（GPT-5.x、Gemini 3.x、Claude 4.x、Grok 4.x）和改进的系统架构。
-- [2026-01] **Trading-R1** [技术报告](https://arxiv.org/abs/2509.11420) 发布，[Terminal](https://github.com/TauricResearch/Trading-R1) 即将上线。
+![1778045422170.png](assets/README/1778045422170.png) ![1778045422167.png](assets/README/1778045422167.png) ![1778045422168.png](assets/README/1778045422168.png) ![1778045422169.png](assets/README/1778045422169.png)
+
+
+[2026-04] **TradingAgents v0.2.4** 发布，新增结构化输出智能体（Research Manager、Trader、Portfolio Manager）、LangGraph 检查点恢复、持久化决策日志、DeepSeek/Qwen/GLM/Azure 供应商支持、Docker 支持，以及 Windows UTF-8 编码修复。完整更新列表见 [CHANGELOG.md](CHANGELOG.md)。
+
+
+[2026-03] **TradingAgents v0.2.3** 发布，新增多语言支持、GPT-5.4 系列模型、统一模型目录、回测日期精度，以及代理支持。
+
+
+[2026-03] **TradingAgents v0.2.2** 发布，新增 GPT-5.4/Gemini 3.1/Claude 4.6 模型覆盖、五级评级体系、OpenAI Responses API、Anthropic effort control，以及跨平台稳定性改进。
+
+
+[2026-02] **TradingAgents v0.2.0** 发布，新增多供应商 LLM 支持（GPT-5.x、Gemini 3.x、Claude 4.x、Grok 4.x）和改进的系统架构。
+
+
+[2026-01] **Trading-R1** [技术报告](https://arxiv.org/abs/2509.11420) 发布，[Terminal](https://github.com/TauricResearch/Trading-R1) 即将上线。
 
 <div align="center">
 <a href="https://www.star-history.com/#TauricResearch/TradingAgents&Date">
@@ -289,6 +300,125 @@ tradingagents report reports/000858_20260506_143000 -t 000858.SZ -d 2026-05-06
 | `--output/-o` | 输出 .docx 路径（默认 `<report_dir>/综合分析报告.docx`） |
 | `--ticker/-t` | 封面页股票代码（默认从目录名自动检测）                     |
 | `--date/-d`   | 封面页分析日期（默认自动检测）                             |
+
+#### qlib — Qlib 数据转换
+
+将已缓存的 OHLCV 数据和 AI 分析信号转换为 [Qlib](https://github.com/microsoft/qlib) 二进制格式，用于量化模型训练和回测。**无需安装 qlib 依赖**——转换使用纯 numpy 写入 Qlib 兼容的二进制文件。
+
+##### 三步流程
+
+```bash
+# 1. 扫描缓存 — 查看有哪些 OHLCV 数据可用
+tradingagents qlib scan                              # 查看全部
+tradingagents qlib scan -t 000858.SZ                 # 指定股票
+
+# 2. 转换 — OHLCV 缓存 → Qlib 二进制
+tradingagents qlib convert                           # 全部缓存 → Qlib 二进制
+tradingagents qlib convert -t 000858.SZ,600036.SH   # 指定股票
+tradingagents qlib convert --with-signals            # 含 AI 分析信号
+tradingagents qlib convert -t 688041.SH --with-signals  # 指定 + 信号
+tradingagents qlib convert -o /path/to/output        # 自定义输出目录
+
+# 3. 回填信号 — 从历史分析日志提取 AI 信号（独立于 convert）
+tradingagents qlib backfill-signals                  # → signals.parquet
+```
+
+| 选项               | 说明                                                                              |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `action`         | 操作：`scan`（扫描缓存）、`convert`（转换）、`backfill-signals`（提取信号） |
+| `--ticker/-t`    | 指定股票代码（不指定则处理全部缓存）                                              |
+| `--output/-o`    | 输出目录（默认 `~/.qlib/qlib_data/tradingagents`）                              |
+| `--with-signals` | convert 时同时合并 AI 分析信号                                                    |
+| `--freq`         | 数据频率（默认 `day`）                                                          |
+
+##### 数据流
+
+```
+~/.tradingagents/cache/           →  convert  →  ~/.qlib/qlib_data/tradingagents/
+  {TICKER}-Tencent-data-*.csv        calendars/day.txt
+  {TICKER}-YFin-data-*.csv           instruments/all.txt
+                                     features/{inst_lower}/{field}.day.bin
+
+~/.tradingagents/logs/            →  backfill →  ~/.qlib/qlib_data/tradingagents_signals.parquet
+  {TICKER}/.../full_states_log_*.json
+```
+
+转换输出 6 个基础特征：`open`, `high`, `low`, `close`, `volume`, `factor`（`factor = Adj Close / Close`）。加 `--with-signals` 后额外输出 4 个 AI 信号特征：
+
+| 特征                | 类型  | 量程     | 来源              | 说明                                                 |
+| ------------------- | ----- | -------- | ----------------- | ---------------------------------------------------- |
+| `ai_score`        | int   | -2 ~ +2  | Portfolio Manager | Buy=2, Overweight=1, Hold=0, Underweight=-1, Sell=-2 |
+| `trader_action`   | int   | -1 ~ +1  | Trader            | Buy=1, Hold=0, Sell=-1                               |
+| `research_rating` | int   | -2 ~ +2  | Research Manager  | 同 ai_score 量程                                     |
+| `price_target`    | float | NaN ~ ∞ | Portfolio Manager | 目标价（大多数日期为 NaN，仅分析过的那天有值）       |
+
+##### Python API
+
+```python
+from tradingagents.qlib.converter import QlibConverter
+from tradingagents.qlib.signal_extractor import extract_from_state, batch_extract_from_logs
+
+# 方式 1：从缓存转换（不含信号）
+converter = QlibConverter("~/.qlib/qlib_data/tradingagents", freq="day")
+result = converter.convert_from_cache(tickers=["000858.SZ"])
+print(result.num_instruments, result.feature_names)
+
+# 方式 2：含 AI 信号
+signals_df = batch_extract_from_logs()  # 先提取信号
+extra_features = {}
+for symbol, group in signals_df.groupby("symbol"):
+    extra_features[symbol] = group.drop(columns=["symbol"])
+result = converter.convert_from_cache(tickers=["000858.SZ"], extra_features=extra_features)
+
+# 方式 3：从分析结果直接提取信号
+from tradingagents.graph.trading_graph import TradingAgentsGraph
+from tradingagents.default_config import DEFAULT_CONFIG
+ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
+state, decision = ta.propagate("000858.SZ", "2026-05-06")
+signals = extract_from_state(state)
+# {'date': '2026-05-06', 'symbol': 'SZ000858', 'ai_score': 0, 'trader_action': -1, ...}
+
+# 方式 4：从任意 DataFrame 转换
+import pandas as pd
+df = pd.read_csv("my_data.csv")  # 必须有 date, symbol 列
+result = converter.convert_from_dataframe(df, feature_cols=["close", "volume"])
+
+# 保存信号 parquet
+from tradingagents.qlib.signal_extractor import save_signals_parquet
+signals_df = batch_extract_from_logs()
+save_signals_parquet(signals_df, "~/.qlib/qlib_data/tradingagents_signals.parquet")
+```
+
+##### 在 Qlib 中使用
+
+```python
+import qlib
+from qlib.data import D
+
+# 加载 TradingAgents 生成的数据
+qlib.init(
+    provider_uri="~/.qlib/qlib_data/tradingagents",
+    region="cn",
+)
+
+# 读取行情数据
+df = D.features(
+    instruments=["SH688041"],
+    fields=["$open", "$close", "$volume"],
+    start_time="2024-01-01",
+    end_time="2026-05-08",
+)
+
+# 读取 AI 信号（需 --with-signals 生成）
+signals = D.features(
+    instruments=["SH688041"],
+    fields=["$ai_score", "$trader_action", "$research_rating", "$price_target"],
+    start_time="2024-01-01",
+    end_time="2026-05-08",
+)
+```
+
+> **注意**：Qlib 使用 `SH688041` 格式的标的名称（大写前缀），字段名需加 `$` 前缀（如 `$close`、`$ai_score`）。AI 信号仅在运行过分析的那天有值，其余日期为 NaN。
 
 ### A 股市场支持
 
