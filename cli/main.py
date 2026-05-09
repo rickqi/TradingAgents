@@ -21,7 +21,6 @@ _cwd_ent = Path.cwd() / ".env.enterprise"
 if _cwd_ent.exists() and _cwd_ent.resolve() != (_CLI_ROOT / ".env.enterprise").resolve():
     load_dotenv(_cwd_ent, override=False)
 from rich.panel import Panel
-from rich.spinner import Spinner
 from rich.live import Live
 from rich.columns import Columns
 from rich.markdown import Markdown
@@ -437,6 +436,37 @@ class MessageBuffer:
 
 message_buffer = MessageBuffer()
 
+# Cache vendor config outside the render loop to avoid repeated imports
+_df_vendor_cache = None
+_df_vendor_cache_time = 0.0
+
+
+def _get_cached_vendor_info() -> tuple:
+    """Return (primary_vendor, opencli_installed) with 5-second TTL cache."""
+    global _df_vendor_cache, _df_vendor_cache_time
+    now = time.time()
+    if _df_vendor_cache is None or (now - _df_vendor_cache_time) > 5.0:
+        from tradingagents.dataflows.config import get_config as _get_df_config
+        _active_vendors = _get_df_config().get("data_vendors", {})
+        _core_vendor = _active_vendors.get("core_stock_apis", "")
+        _primary_vendor = _core_vendor.split(",")[0] if _core_vendor else "unknown"
+        _df_vendor_cache = (_primary_vendor, shutil.which("opencli") is not None)
+        _df_vendor_cache_time = now
+    return _df_vendor_cache
+
+
+def _status_text(status: str) -> str:
+    """Return static colored status text (no Spinner animation to avoid flicker)."""
+    if status == "in_progress":
+        return "[bold cyan]* running[/bold cyan]"
+    status_color = {
+        "pending": "yellow",
+        "completed": "green",
+        "error": "red",
+    }.get(status, "white")
+    icon = {"pending": ".", "completed": "+", "error": "!"}.get(status, " ")
+    return f"[{status_color}]{icon} {status}[/{status_color}]"
+
 
 def create_layout():
     layout = Layout()
@@ -572,36 +602,14 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         # Add first agent with team name
         first_agent = agents[0]
         status = message_buffer.agent_status.get(first_agent, "pending")
-        if status == "in_progress":
-            spinner = Spinner(
-                "dots", text="[blue]in_progress[/blue]", style="bold cyan"
-            )
-            status_cell = spinner
-        else:
-            status_color = {
-                "pending": "yellow",
-                "completed": "green",
-                "error": "red",
-            }.get(status, "white")
-            status_cell = f"[{status_color}]{status}[/{status_color}]"
+        status_cell = _status_text(status)
         duration_str = message_buffer.get_agent_duration(first_agent)
         progress_table.add_row(team, first_agent, status_cell, duration_str)
 
         # Add remaining agents in team
         for agent in agents[1:]:
             status = message_buffer.agent_status.get(agent, "pending")
-            if status == "in_progress":
-                spinner = Spinner(
-                    "dots", text="[blue]in_progress[/blue]", style="bold cyan"
-                )
-                status_cell = spinner
-            else:
-                status_color = {
-                    "pending": "yellow",
-                    "completed": "green",
-                    "error": "red",
-                }.get(status, "white")
-                status_cell = f"[{status_color}]{status}[/{status_color}]"
+            status_cell = _status_text(status)
             duration_str = message_buffer.get_agent_duration(agent)
             progress_table.add_row("", agent, status_cell, duration_str)
 
@@ -739,18 +747,14 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         stats_parts.append(elapsed_str)
 
     # Data source indicator — show active vendor + OpenCLI status
-    from tradingagents.dataflows.config import get_config as _get_df_config
-    _active_vendors = _get_df_config().get("data_vendors", {})
-    _core_vendor = _active_vendors.get("core_stock_apis", "")
-    # Pick the primary vendor (first in comma-separated chain)
-    _primary_vendor = _core_vendor.split(",")[0] if _core_vendor else "unknown"
+    _primary_vendor, _opencli_installed = _get_cached_vendor_info()
 
     _OPENCLI_TOOLS = {
         "get_money_flow", "get_northbound", "get_sectors", "get_longhu", "get_hot_rank",
         "get_quote", "get_kline", "get_index_board", "get_kuaixun", "get_holders", "get_announcement",
     }
     opencli_calls = sum(1 for _, name, _ in message_buffer.tool_calls if name in _OPENCLI_TOOLS)
-    if shutil.which("opencli"):
+    if _opencli_installed:
         if opencli_calls > 0:
             stats_parts.append(f"Data: [green]{_primary_vendor}[/green] + [cyan]OpenCLI({opencli_calls})[/cyan]")
         else:
@@ -1809,16 +1813,11 @@ def run_analysis(checkpoint: bool = False, diag: bool = False, cli_overrides: di
 
     _diag("Entering Live context")
 
-    with Live(layout, refresh_per_second=4, redirect_stdout=False, redirect_stderr=False) as live:
+    with Live(layout, auto_refresh=False, redirect_stdout=False, redirect_stderr=False) as live:
         _diag("Live context entered")
 
-        # Initial display
-        _diag("Before first update_display")
-        update_display(layout, stats_handler=stats_handler, start_time=start_time)
-        _diag("After first update_display")
-
-        # Add initial messages
-        _diag("Adding initial messages")
+        # Set up initial state and render once
+        _diag("Setting up initial state")
         message_buffer.add_message("System", f"Selected ticker: {selections['ticker']}")
         message_buffer.add_message(
             "System", f"Analysis date: {selections['analysis_date']}"
@@ -1827,22 +1826,11 @@ def run_analysis(checkpoint: bool = False, diag: bool = False, cli_overrides: di
             "System",
             f"Selected analysts: {', '.join(analyst.value for analyst in selections['analysts'])}",
         )
-        _diag("Messages added, calling update_display")
-        update_display(layout, stats_handler=stats_handler, start_time=start_time)
-        _diag("update_display 2 done")
-
-        # Update agent status to in_progress for the first analyst
         first_analyst = f"{selections['analysts'][0].value.capitalize()} Analyst"
         message_buffer.update_agent_status(first_analyst, "in_progress")
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
-        _diag("Agent status set, creating spinner")
-
-        # Create spinner text
-        spinner_text = (
-            f"Analyzing {selections['ticker']} on {selections['analysis_date']}..."
-        )
-        update_display(layout, spinner_text, stats_handler=stats_handler, start_time=start_time)
-        _diag("Spinner set, initializing graph")
+        live.update(layout, refresh=True)
+        _diag("Initial display done")
 
         # Initialize state and get graph args with callbacks
         # Auto-detect A-share / HK tickers so tencent_sina is used instead of
@@ -1871,6 +1859,10 @@ def run_analysis(checkpoint: bool = False, diag: bool = False, cli_overrides: di
         _error_msg = None
         _error_tb = None
         _interrupted = False
+        _last_display_time = 0.0  # Throttle: only redraw at most every 1s
+        _DISPLAY_THROTTLE = 1.0   # seconds between display rebuilds
+        _pending_display = False  # True if data changed but display hasn't updated yet
+        _dirty = False            # True if any meaningful state changed since last render
         message_buffer.completion_times["_start"] = time.time()
         try:
           for chunk in graph.graph.stream(init_agent_state, **args):
@@ -2004,8 +1996,14 @@ def run_analysis(checkpoint: bool = False, diag: bool = False, cli_overrides: di
                         message_buffer.update_agent_status("Neutral Analyst", "completed")
                         message_buffer.update_agent_status("Portfolio Manager", "completed")
 
-            # Update the display
-            update_display(layout, stats_handler=stats_handler, start_time=start_time)
+            # Update the display (throttled to avoid flickering)
+            _dirty = True
+            _now = time.time()
+            if _now - _last_display_time >= _DISPLAY_THROTTLE:
+                update_display(layout, stats_handler=stats_handler, start_time=start_time)
+                live.update(layout, refresh=True)
+                _last_display_time = _now
+                _dirty = False
 
             trace.append(chunk)
 
@@ -2021,6 +2019,11 @@ def run_analysis(checkpoint: bool = False, diag: bool = False, cli_overrides: di
             _diag("KeyboardInterrupt")
 
         _diag(f"Stream ended. trace={len(trace)}, error={_error_msg is not None}, interrupted={_interrupted}")
+
+        # Flush any pending display update that was throttled
+        if _dirty or _pending_display:
+            update_display(layout, stats_handler=stats_handler, start_time=start_time)
+            live.update(layout, refresh=True)
 
         # Get final state and decision
         if not trace:
