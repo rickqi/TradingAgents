@@ -180,24 +180,30 @@ def _tencent_symbol(ticker: str) -> str:
 
 _TENCENT_A_KLINE_URL = (
     "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-    "?param={sym},day,,,{days},qfq"
+    "?param={sym},day,,,{days},{fq}"
 )
 _TENCENT_HK_KLINE_URL = (
     "https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get"
-    "?param={sym},day,,,{days},qfq"
+    "?param={sym},day,,,{days},{fq}"
 )
 
 
-def _fetch_tencent_kline(sym: str, days: int = 1200) -> list[list]:
+def _fetch_tencent_kline(sym: str, days: int = 1200, fq: str = "qfq") -> list[list]:
     """Fetch daily K-line data from Tencent and return raw list of entries.
 
     A-share entry: ``[date_str, open, close, high, low, volume]``.
     HK entry: ``[date_str, open, close, high, low, volume, ...]`` (extra fields ignored).
+
+    Parameters
+    ----------
+    fq : str
+        Adjustment type: ``"qfq"`` (forward-adjusted / 前复权, default),
+        ``"hfq"`` (backward-adjusted / 后复权), or ``""`` (unadjusted / 不复权).
     """
     is_hk = sym.startswith("hk") and not sym.startswith("hk0") == False  # 5-digit HK codes
     is_hk = sym.startswith("hk")
     url_template = _TENCENT_HK_KLINE_URL if is_hk else _TENCENT_A_KLINE_URL
-    url = url_template.format(sym=sym, days=days)
+    url = url_template.format(sym=sym, days=days, fq=fq)
 
     resp = _api_get(url, headers=None, timeout=15)
     payload = resp.json()
@@ -205,17 +211,29 @@ def _fetch_tencent_kline(sym: str, days: int = 1200) -> list[list]:
     # Navigate JSON structure
     data_section = payload.get("data", {})
     stock_data = data_section.get(sym, {})
-    # Prefer qfqday (forward-adjusted), fall back to day
+    # Prefer qfqday (forward-adjusted), fall back to day (unadjusted)
     raw_rows = stock_data.get("qfqday") or stock_data.get("day") or []
 
     return raw_rows
 
 
-def _kline_to_dataframe(raw_rows: list[list]) -> pd.DataFrame:
+def _kline_to_dataframe(raw_rows: list[list],
+                        qfq_rows: list[list] | None = None) -> pd.DataFrame:
     """Convert Tencent K-line rows to a standard OHLCV DataFrame.
 
     Tencent field order: ``[date, open, CLOSE, HIGH, LOW, volume]`` —
     close comes before high/low.
+
+    Parameters
+    ----------
+    raw_rows : list[list]
+        Unadjusted (不复权) K-line rows.  These become the base OHLCV columns.
+    qfq_rows : list[list] or None
+        Forward-adjusted (前复权) K-line rows.  When provided, the *Close*
+        column is set to the qfq close price (``Adj Close``), and the base
+        *Close* comes from *raw_rows* (unadjusted).  This yields a real
+        ``Adj Close / Close`` factor in downstream consumers.  When ``None``,
+        falls back to legacy behaviour (Adj Close == Close).
     """
     records = []
     for row in raw_rows:
@@ -233,8 +251,22 @@ def _kline_to_dataframe(raw_rows: list[list]) -> pd.DataFrame:
             }
         )
     df = pd.DataFrame(records)
-    if not df.empty:
+    if df.empty:
+        return df
+
+    if qfq_rows is not None:
+        # Build qfq close lookup
+        qfq_close_map: dict[str, float] = {}
+        for row in qfq_rows:
+            if len(row) >= 3:
+                qfq_close_map[row[0]] = float(row[2])  # [date, open, CLOSE, ...]
+        # Map qfq close → Adj Close
+        df["Adj Close"] = df["Date"].map(qfq_close_map)
+        # If any dates don't match (rare), fill with base Close
+        df["Adj Close"] = df["Adj Close"].fillna(df["Close"])
+    else:
         df["Adj Close"] = df["Close"]
+
     return df
 
 
@@ -1040,6 +1072,11 @@ def load_ohlcv_tencent(symbol: str, curr_date: str) -> pd.DataFrame:
 
     Mirrors ``load_ohlcv()`` but uses the Tencent K-line API instead of
     yfinance.
+
+    The cached CSV stores **unadjusted** OHLCV with a separate ``Adj Close``
+    column containing the forward-adjusted (前复权) close price.  This allows
+    downstream consumers (e.g. the Qlib converter) to compute a real
+    ``factor = Adj Close / Close``.
     """
     safe_symbol = safe_ticker_component(symbol)
 
@@ -1066,10 +1103,11 @@ def load_ohlcv_tencent(symbol: str, curr_date: str) -> pd.DataFrame:
             # Fall back to treating symbol as-is if it can't be normalized
             sym = symbol
 
-        # Fetch ~5 years of data
+        # Fetch ~5 years of data — both unadjusted and forward-adjusted
         fetch_days = 1300
-        raw = _fetch_tencent_kline(sym, days=fetch_days)
-        data = _kline_to_dataframe(raw)
+        raw_unadj = _fetch_tencent_kline(sym, days=fetch_days, fq="")
+        raw_qfq = _fetch_tencent_kline(sym, days=fetch_days, fq="qfq")
+        data = _kline_to_dataframe(raw_unadj, qfq_rows=raw_qfq)
 
         if data.empty:
             raise RuntimeError(f"No OHLCV data returned from Tencent for {symbol}")
