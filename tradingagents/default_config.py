@@ -59,6 +59,21 @@ _DEFAULT_CONFIG_TEMPLATE = {
     "tool_vendors": {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
+    # Unified per-vendor rate limiting
+    # When enabled, route_to_vendor() automatically throttles calls to each
+    # vendor according to the limits below.  Vendors with their own internal
+    # rate limiter (e.g. twelve_data) are intentionally omitted.
+    "rate_limit_enabled": True,
+    "rate_limits": {
+        # "vendor_name": {"min_interval": seconds, "calls_per_minute": int}
+        # User overrides here are merged with the defaults in rate_limiter.py.
+        # Uncomment to override:
+        # "tencent_sina":  {"min_interval": 0.3, "calls_per_minute": 120},
+        # "akshare":       {"min_interval": 0.5, "calls_per_minute": 60},
+        # "yfinance":      {"min_interval": 1.0, "calls_per_minute": 30},
+        # "alpha_vantage": {"min_interval": 0.5, "calls_per_minute": 5},
+        # "opencli":       {"min_interval": 0.5, "calls_per_minute": 60},
+    },
 }
 
 

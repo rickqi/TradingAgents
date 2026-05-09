@@ -4,6 +4,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from .rate_limiter import get_rate_limiter
+
 # Import from vendor-specific modules
 from .y_finance import (
     get_YFin_data_online,
@@ -281,6 +283,8 @@ def route_to_vendor(method: str, *args, **kwargs):
             fallback_vendors.append(vendor)
 
     last_error = None
+    rate_limiter = get_rate_limiter()
+
     for vendor in fallback_vendors:
         if vendor not in VENDOR_METHODS[method]:
             continue
@@ -288,16 +292,22 @@ def route_to_vendor(method: str, *args, **kwargs):
         vendor_impl = VENDOR_METHODS[method][vendor]
         impl_func = vendor_impl[0] if isinstance(vendor_impl, list) else vendor_impl
 
+        # Pre-call: wait for vendor's rate limit slot
+        rate_limiter.wait(vendor)
+
         try:
-            return impl_func(*args, **kwargs)
+            result = impl_func(*args, **kwargs)
+            # Success — clear any accumulated backoff penalty
+            rate_limiter.reset_penalty(vendor)
+            return result
         except Exception as e:
             last_error = e
+            is_rate_limit = "Rate" in str(e) or "rate" in str(e) or "429" in str(e)
+            if is_rate_limit:
+                # Signal 429 → limiter adds exponential penalty
+                rate_limiter.mark_rate_limited(vendor)
             logger.warning("Vendor '%s' failed for '%s': %s — trying next",
                            vendor, method, e)
-            # Brief pause before trying next vendor; yfinance rate limits
-            # need a longer cooldown before the next vendor attempt.
-            cooldown = 2.0 if "Rate" in str(e) or "rate" in str(e) else 1.0
-            time.sleep(cooldown)
             continue  # Any error triggers fallback to next vendor
 
     # All vendors failed — return a user-friendly message instead of crashing
