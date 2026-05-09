@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tradingagents.qlib.ticker_mapper import to_qlib_instrument, qlib_instrument_to_dirname, from_qlib_instrument
-from tradingagents.qlib.cache_scanner import scan_cache
+from tradingagents.qlib.cache_scanner import scan_cache, CachedOHLCV
 
 
 @dataclass
@@ -125,7 +125,26 @@ class QlibConverter:
                 instrument_list=[],
             )
 
-        # 3. Read and normalize each cached file
+        # 3. Deduplicate: keep only the best file per Qlib instrument.
+        #    Multiple cache files may exist for the same stock:
+        #      - Different ticker formats: "688256" vs "688256.SH" → same SH688256
+        #      - Different download dates: different date ranges / row counts
+        #    Selection priority: most rows first, then latest end_date.
+        best_per_instrument: dict[str, CachedOHLCV] = {}
+        for cached in cached_files:
+            inst_key = cached.qlib_instrument or cached.ticker.upper()
+            existing = best_per_instrument.get(inst_key)
+            if existing is None:
+                best_per_instrument[inst_key] = cached
+            elif cached.num_rows > existing.num_rows:
+                best_per_instrument[inst_key] = cached
+            elif cached.num_rows == existing.num_rows and cached.date_end > existing.date_end:
+                best_per_instrument[inst_key] = cached
+        cached_files = list(best_per_instrument.values())
+        print(f"Deduplicated: {len(best_per_instrument)} unique instruments "
+              f"from cache files")
+
+        # 4. Read and normalize each cached file
         all_frames: list[pd.DataFrame] = []
         for cached in cached_files:
             try:

@@ -1,6 +1,6 @@
 # OpenCLI 财经站点完整分析报告
 
-> 分析日期: 2026-05-04 | OpenCLI 版本: v1.7.11 | 总命令数: 628 | 财经相关: 9 站点 / 73 命令
+> 分析日期: 2026-05-04 | 更新: 2026-05-08 | OpenCLI 版本: v1.7.12 | 总命令数: 628 | 财经相关: 9 站点 / 73 命令
 
 ---
 
@@ -19,7 +19,7 @@
 | `northbound` | 沪深港通北向/南向资金分时净流入（万元） | public | ❌ | (分时数据) |
 | `sectors` | 板块排行（行业/概念/地域）按涨跌幅/主力资金/成交额排序 | public | ❌ | rank, code, name, price, changePercent, mainNet, leadStock, leadChangePercent, upCount, downCount |
 | `kline <symbol>` | K线历史数据（分/日/周/月/前复权/后复权） | public | ❌ | (OHLCV) |
-| `longhu` | 龙虎榜明细（交易所公开披露） | public | ❌ | (龙虎榜数据) |
+| `longhu` | 龙虎榜明细（交易所公开披露，v1.7.12 返回全量数据） | public | ❌ | (龙虎榜数据) |
 | `index-board` | 主要市场指数行情（A股/港股/美股） | public | ❌ | (指数数据) |
 | `etf` | ETF 列表按成交额/涨跌幅排行 | public | ❌ | (ETF数据) |
 | `convertible` | 可转债行情列表（默认按成交额排序） | public | ❌ | (可转债数据) |
@@ -354,4 +354,72 @@ python scripts/run_a_share.py <CODE> <DATE>
 3. **Yahoo Finance 中国区封锁**: 无法从中国大陆使用,trace 显示 "Yahoo 产品与服务不可用"
 4. **数据非逐笔**: 所有行情为近实时,存在短暂延迟
 5. **A股代码格式差异**: eastmoney 用纯数字(600519), xueqiu 用带前缀(SH600519)
-6. **opencli 版本**: v1.7.11, 建议定期 `npm update -g @jackwener/opencli` 更新
+6. **opencli 版本**: v1.7.12, 建议定期 `npm update -g @jackwener/opencli` 更新
+
+---
+
+## 六、v1.7.12 实战验证记录
+
+> 基于 2026-05-08 实际使用 opencli v1.7.12 执行完整市场分析日报的验证结果。
+
+### 6.1 破坏性变更
+
+| 命令 | v1.7.11 行为 | v1.7.12 行为 | 解决方案 |
+|---|---|---|---|
+| `eastmoney quote 688041.SH` | ✅ 正常 | ❌ "Unrecognized symbol" | 使用纯数字: `quote 688041` |
+| `eastmoney kline 688041.SH` | ✅ 正常 | ❌ 报错 | 同上: `kline 688041` |
+| `eastmoney quote 600519,000858` | ✅ 正常 | ⚠️ 不稳定,可能报错 | 逐个查询最可靠 |
+| `eastmoney longhu <symbol>` | 支持按个股过滤 | 不再支持位置参数过滤 | 返回全量数据,自行过滤 |
+| `eastmoney money-flow <symbol>` | 支持按个股过滤 | 不再支持位置参数过滤 | 返回排行数据,自行匹配 |
+
+### 6.2 已验证可用命令
+
+以下命令在 v1.7.12 上实测可用(2026-05-08):
+
+| 命令 | 测试状态 | 返回数据质量 | 备注 |
+|---|---|---|---|
+| `eastmoney index-board` | ✅ | 优秀 | 包含主要 A 股/港股/美股指数 |
+| `eastmoney rank --limit 20` | ✅ | 优秀 | 涨跌排行,含市值/PE/换手率 |
+| `eastmoney sectors --limit 15` | ✅ | 优秀 | 板块排行,`BK` 前缀代码,含领涨股 |
+| `eastmoney money-flow --limit 15` | ✅ | 优秀 | 主力资金排行,区分超大/大/中/小单 |
+| `eastmoney northbound` | ✅ | 良好 | 返回分时累计数据数组(万元) |
+| `eastmoney longhu` | ✅ | 良好 | 全量龙虎榜,无个股过滤 |
+| `eastmoney kuaixun --limit 15` | ✅ | 良好 | 7×24 快讯,Windows 下 `-f json` 避免编码问题 |
+| `tdx hot-rank --limit 10` | ✅ | 良好 | 人气榜,含标签和人气值 |
+| `eastmoney quote <code>` | ✅ | 优秀 | **纯数字代码**,16 项字段 |
+| `eastmoney kline <code>` | ✅ | 优秀 | **纯数字代码**,OHLCV 数据 |
+
+### 6.3 实战工作流
+
+2026-05-08 市场分析日报使用的 8+20 命令序列:
+
+```
+# 阶段 1: 市场全景 (并行,均为公共 API)
+opencli eastmoney index-board -f json
+opencli eastmoney rank --limit 20 -f json
+opencli eastmoney sectors --limit 15 -f json
+opencli eastmoney money-flow --limit 15 -f json
+opencli eastmoney northbound -f json
+opencli eastmoney longhu -f json
+opencli tdx hot-rank --limit 10 -f json
+opencli eastmoney kuaixun --limit 15 -f json
+
+# 阶段 2: 持仓跟踪 (逐个执行,避免逗号分隔不稳定)
+opencli eastmoney quote 688041 -f json    # 兆易创新
+opencli eastmoney quote 688256 -f json    # 寒武纪
+opencli eastmoney quote 688012 -f json    # 中微公司
+# ... 对每只持仓股逐个执行
+
+# 阶段 3: 深入分析 (按需)
+opencli eastmoney kline <code> -f json    # 对异常个股查 K 线
+```
+
+### 6.4 数据解读要点
+
+| 数据源 | 关键字段 | 解读方法 |
+|---|---|---|
+| `money-flow` | `mainNet`(主力净流入,万元) | 正值=机构净买入;关注连续 3 日同方向 |
+| `northbound` | 最后一个值=当日累计 | 北向单日+400亿以上为强信号 |
+| `sectors` | `mainNet` + `leadStock` | 板块资金+龙头共振=板块趋势确认 |
+| `longhu` | 机构专用席位 | 同一机构席位出现在多只个股=板块级布局 |
+| `index-board` | `changePercent` | 三大指数涨跌一致性=市场方向,分化=结构性行情 |
