@@ -1,6 +1,6 @@
 # AGENTS.md — tradingagents/dataflows
 
-市场数据抽象层。将 10 个工具方法路由到 5 个数据供应商，支持降级链。
+市场数据抽象层。将 10 个工具方法路由到 6 个数据供应商，支持降级链。
 
 ## 目录结构
 
@@ -18,6 +18,7 @@ dataflows/
 ├── tencent_sina.py         # A 股: 腾讯 K 线 + 新浪行情 + 东方财富 API
 ├── akshare_vendor.py       # A 股: AKShare — 内幕交易, 情绪, 个股财报
 ├── twelve_data.py          # Twelve Data — REST API，9 个方法（无需额外 pip 依赖）
+├── tushare.py              # Tushare Pro — REST API，6 个方法（需 pip install tushare）
 └── opencli_vendor.py       # A 股: OpenCLI — 11 个 A 股数据函数 + 1 个加密货币函数（可选）
 ```
 
@@ -30,8 +31,8 @@ dataflows/
 
 ### A 股自动检测
 
-当中文模式激活时（任意 `data_vendors` 类别包含 `"tencent_sina"` 或 `"akshare"`）：
-- `route_to_vendor()` 跳过 `_SKIP_FOR_CHINESE = {"yfinance", "alpha_vantage"}` 中的供应商
+当中文模式激活时（任意 `data_vendors` 类别包含 `"tencent_sina"`、`"akshare"` 或 `"tushare"`）：
+- `route_to_vendor()` 跳过 `_WESTERN_VENDORS = {"yfinance", "alpha_vantage", "twelve_data"}` 中的供应商
 - 这些供应商没有有用的 A 股数据，且触达限速会浪费数分钟
 - 每次调用独立检测：`is_chinese_mode` 在每次调用时从 `primary_vendors` 重新判定
 
@@ -41,13 +42,13 @@ dataflows/
 
 检测到 A 股后，数据供应商自动设置为：大部分类别使用 `tencent_sina`，`sentiment_data` 使用 `akshare`，`fundamental_data` 使用 `"tencent_sina,akshare"`。
 
-**10 个工具方法**定义在 `VENDOR_METHODS` 中，每个方法最多有 4 个供应商实现：
+**10 个工具方法**定义在 `VENDOR_METHODS` 中，每个方法最多有 6 个供应商实现：
 
 | 方法 | 类别 | 供应商 |
 |--------|----------|---------|
-| `get_stock_data` | core_stock_apis | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data |
-| `get_indicators` | technical_indicators | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data |
-| `get_fundamentals`, `get_balance_sheet`, `get_cashflow`, `get_income_statement` | fundamental_data | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data |
+| `get_stock_data` | core_stock_apis | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data, tushare |
+| `get_indicators` | technical_indicators | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data, tushare |
+| `get_fundamentals`, `get_balance_sheet`, `get_cashflow`, `get_income_statement` | fundamental_data | yfinance, alpha_vantage, tencent_sina, akshare, twelve_data, tushare |
 | `get_news`, `get_global_news`, `get_insider_transactions` | news_data | yfinance, alpha_vantage, tencent_sina, twelve_data（akshare 仅支持 insider_transactions） |
 | `get_sentiment` | sentiment_data | 仅 akshare |
 
@@ -56,7 +57,9 @@ dataflows/
 1. 创建 `new_vendor.py`，实现所需方法（签名与现有供应商一致）
 2. 在 `interface.py` 中导入，并将每个方法添加到 `VENDOR_METHODS[method]["new_vendor"]`
 3. 将 `"new_vendor"` 添加到 `VENDOR_LIST`
-4. 无需其他注册——降级链会自动包含它
+4. 如是 A 股供应商：加入 `_CHINESE_VENDORS`；如是西方供应商：加入 `_WESTERN_VENDORS`
+5. 如是可选 pip 依赖：用条件导入（`try: import xxx`），不要加到 `pyproject.toml`
+6. 无需其他注册——降级链会自动包含它
 
 ## 新增工具方法
 
@@ -101,6 +104,22 @@ dataflows/
 - 错误处理：所有方法 try/except 包裹，失败时返回错误字符串（不抛异常），允许降级链尝试下一个供应商
 - 技术指标名必须小写：`rsi`, `macd`, `close_50_sma`, `close_200_sma`, `boll` 等（完整列表见 `_INDICATOR_CONFIG`）
 - Ticker 格式：不带交易所后缀（`AAPL`，不是 `AAPL.US`）
+
+## tushare 特性（A 股供应商）
+
+- 条件导入（`try: import tushare`），未安装时返回错误字符串，降级链自动尝试下一个供应商
+- API Key 通过环境变量 `TUSHARE_API_KEY` 获取
+- **6 个方法**注册到 `VENDOR_METHODS`：`get_stock_data`, `get_indicators`, `get_fundamentals`, `get_balance_sheet`, `get_cashflow`, `get_income_statement`
+- 属于 `_CHINESE_VENDORS`，西方模式下自动排除
+- Ticker 格式：`ts_code` = `000858.SZ`（6位代码 + 交易所后缀）；`_normalize_to_ts_code()` 负责从各种格式转换
+- **`get_stock_data`**：`pro.daily()` + `pro.adj_factor()`，前复权 Adj Close = `close * adj_factor / latest_adj_factor`，成交量 手→股（×100）
+- **`get_indicators`**：`pro.daily_basic()` — PE/PB/PS/PE_TTM/换手率/量比/市值（需 ≥2000 积分）
+- **`get_fundamentals`**：`pro.fina_indicator()` — ROE/毛利率/净利率/BPS/EPS
+- **财务报表**：`pro.income()`、`pro.balancesheet()`、`pro.cashflow()` — 标准 Tushare 财务报表（需 ≥2000 积分）
+- 所有财务方法通过 `ann_date <= curr_date` 过滤防止前视偏差
+- 错误处理：所有方法 try/except 包裹，失败时返回错误字符串（不抛异常），降级链自动尝试下一个供应商
+- 懒加载：`_get_pro_api()` 单例，首次调用时初始化 tushare SDK
+- 限速：统一 rate limiter（0.3s 间隔，120次/分钟）
 
 ## 配置单例
 

@@ -2339,7 +2339,7 @@ def report(
 def qlib(
     action: str = typer.Argument(
         ...,
-        help="操作: scan (扫描缓存), convert (OHLCV缓存→Qlib二进制), backfill-signals (JSON日志→信号文件), bulk-download (批量下载A股OHLCV)",
+        help="操作: scan (扫描缓存), convert (OHLCV缓存→Qlib二进制), backfill-signals (JSON日志→信号文件), bulk-download (批量下载A股OHLCV), dolt-push (缓存→DoltHub推送)",
     ),
     ticker: Optional[str] = typer.Option(
         None, "--ticker", "-t",
@@ -2357,6 +2357,18 @@ def qlib(
         "day", "--freq",
         help="数据频率: day",
     ),
+    no_push: bool = typer.Option(
+        False, "--no-push",
+        help="dolt-push: 仅本地提交，不推送到 DoltHub",
+    ),
+    chunk_size: int = typer.Option(
+        500000, "--chunk-size",
+        help="dolt-push: 每 CSV 分块行数",
+    ),
+    keep_tmp: bool = typer.Option(
+        False, "--keep-tmp",
+        help="dolt-push: 保留临时目录（调试用）",
+    ),
 ):
     """Qlib 数据转换与信号提取。
 
@@ -2368,6 +2380,9 @@ def qlib(
       tradingagents qlib backfill-signals                # JSON 日志 → 信号文件
       tradingagents qlib bulk-download                   # 批量下载全部A股 OHLCV
       tradingagents qlib bulk-download -t 000858.SZ,600519.SH  # 指定股票下载
+      tradingagents qlib dolt-push                       # 缓存 → DoltHub 推送
+      tradingagents qlib dolt-push -t 000858.SZ          # 指定股票推送
+      tradingagents qlib dolt-push --no-push             # 仅本地提交，不推送
     """
     try:
         if action == "scan":
@@ -2484,9 +2499,43 @@ def qlib(
 
             console.print(table)
 
+        elif action == "dolt-push":
+            from tradingagents.qlib.dolt_publisher import dolt_push, DOLTHUB_REMOTE
+
+            ticker_list = None
+            if ticker:
+                ticker_list = [t.strip() for t in ticker.split(",") if t.strip()]
+
+            console.print("[cyan]Publishing cached OHLCV data to DoltHub...[/cyan]")
+
+            result = dolt_push(
+                tickers=ticker_list,
+                push=not no_push,
+                chunk_size=chunk_size,
+                keep_tmp=keep_tmp,
+            )
+
+            table = Table(
+                title="DoltHub 推送结果",
+                show_header=True,
+                header_style="bold magenta",
+                box=box.ROUNDED,
+            )
+            table.add_column("指标", justify="left")
+            table.add_column("值", justify="left")
+
+            table.add_row("标的数量", str(result.total_instruments))
+            table.add_row("数据行数", f"{result.total_rows:,}")
+            table.add_row("已推送", "Yes" if result.pushed else "No (--no-push)")
+            if result.commit_hash:
+                table.add_row("Commit", result.commit_hash)
+            table.add_row("DoltHub", f"https://www.dolthub.com/repositories/{DOLTHUB_REMOTE}")
+
+            console.print(table)
+
         else:
             console.print(f"[red]Unknown action: {action}[/red]")
-            console.print("[dim]Valid actions: scan, convert, backfill-signals, bulk-download[/dim]")
+            console.print("[dim]Valid actions: scan, convert, backfill-signals, bulk-download, dolt-push[/dim]")
             raise typer.Exit(code=1)
 
     except typer.Exit:

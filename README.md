@@ -307,7 +307,7 @@ tradingagents report reports/000858_20260506_143000 -t 000858.SZ -d 2026-05-06
 
 将已缓存的 OHLCV 数据和 AI 分析信号转换为 [Qlib](https://github.com/microsoft/qlib) 二进制格式，用于量化模型训练和回测。**无需安装 qlib 依赖**——转换使用纯 numpy 写入 Qlib 兼容的二进制文件。
 
-##### 四步流程
+##### 五步流程
 
 ```bash
 # 0. 批量下载（可选）— 从东方财富获取全市场 A 股列表，通过腾讯 K 线 API 下载 OHLCV
@@ -328,15 +328,23 @@ tradingagents qlib convert -o /path/to/output        # 自定义输出目录
 
 # 3. 回填信号 — 从历史分析日志提取 AI 信号（独立于 convert）
 tradingagents qlib backfill-signals                  # → signals.parquet
+
+# 4. 推送 DoltHub — 缓存数据同步到版本化 SQL 数据库
+tradingagents qlib dolt-push                         # 全部缓存 → DoltHub
+tradingagents qlib dolt-push -t 000858.SZ,600519.SH # 指定股票
+tradingagents qlib dolt-push --no-push               # 仅本地提交，不推送
 ```
 
 | 选项               | 说明                                                                              |
 | ------------------ | --------------------------------------------------------------------------------- |
-| `action`         | 操作：`scan`（扫描缓存）、`convert`（转换）、`backfill-signals`（提取信号）、`bulk-download`（批量下载 A 股 OHLCV） |
+| `action`         | 操作：`scan`（扫描缓存）、`convert`（转换）、`backfill-signals`（提取信号）、`bulk-download`（批量下载 A 股 OHLCV）、`dolt-push`（推送 DoltHub） |
 | `--ticker/-t`    | 指定股票代码（不指定则处理全部缓存/全市场）                                       |
 | `--output/-o`    | 输出目录（默认 `~/.qlib/qlib_data/tradingagents`）                              |
 | `--with-signals` | convert 时同时合并 AI 分析信号                                                    |
 | `--freq`         | 数据频率（默认 `day`）                                                          |
+| `--no-push`      | dolt-push 时仅本地提交，不推送到 DoltHub                                          |
+| `--chunk-size`   | dolt-push 时每 CSV 分块行数（默认 500,000）                                      |
+| `--keep-tmp`     | dolt-push 时保留临时目录（调试用）                                               |
 
 ##### 数据流
 
@@ -437,6 +445,108 @@ signals = D.features(
 ```
 
 > **注意**：Qlib 使用 `SH688041` 格式的标的名称（大写前缀），字段名需加 `$` 前缀（如 `$close`、`$ai_score`）。AI 信号仅在运行过分析的那天有值，其余日期为 NaN。
+
+##### DoltHub 数据推送
+
+将缓存数据推送到 [DoltHub](https://www.dolthub.com/repositories/rickqi/tradingagents) 版本化 SQL 数据库，支持 SQL 查询、数据版本管理和协作。直接从 `.tradingagents/cache` 读取，**无需先执行 Qlib 转换**。
+
+**前置条件：**
+
+```bash
+winget install DoltHub.Dolt     # 安装 Dolt
+dolt login                       # 认证 DoltHub 账号
+```
+
+**数据流：**
+
+```
+~/.tradingagents/cache/          →  dolt-push  →  DoltHub (rickqi/tradingagents)
+  {TICKER}-Tencent-data-*.csv                      a_stock_eod_price
+  {TICKER}-YFin-data-*.csv                         trade_calendar
+  {TICKER}-AKShare-data-*.csv                      stock_list
+```
+
+**推送流程：** 缓存去重（每只股票选行数最多 + 日期最新的文件） → 生成 CSV → `dolt clone` → `dolt table import` → `dolt commit` → `dolt push`
+
+**表结构与 Schema：**
+
+**`a_stock_eod_price`** — 日 OHLCV 行情（主表）
+
+| 列名       | 类型        | 约束      | 说明                                    |
+| ---------- | ----------- | --------- | --------------------------------------- |
+| `tradedate`  | DATE        | NOT NULL  | 交易日期（如 `2026-05-08`）             |
+| `symbol`     | VARCHAR(20) | NOT NULL  | Qlib 格式标的代码（如 `SZ000858`）      |
+| `open`       | DOUBLE      |           | 开盘价                                  |
+| `high`       | DOUBLE      |           | 最高价                                  |
+| `low`        | DOUBLE      |           | 最低价                                  |
+| `close`      | DOUBLE      |           | 收盘价                                  |
+| `volume`     | DOUBLE      |           | 成交量                                  |
+| `adjclose`   | DOUBLE      |           | 复权收盘价（腾讯数据 = close，YFin 可不同） |
+| `vendor`     | VARCHAR(20) |           | 数据源标识（`Tencent`、`YFin`、`AKShare`） |
+
+> **主键**：`(tradedate, symbol)` — 每只股票每天一行
+
+**`trade_calendar`** — 交易日历
+
+| 列名        | 类型        | 约束      | 说明                   |
+| ----------- | ----------- | --------- | ---------------------- |
+| `trade_date` | VARCHAR(20) | NOT NULL  | 交易日期（`YYYY-MM-DD`） |
+| `is_open`    | INT         |           | 是否交易日（固定为 1）  |
+
+> **主键**：`trade_date`
+
+**`stock_list`** — 标的列表
+
+| 列名        | 类型        | 约束      | 说明                                  |
+| ----------- | ----------- | --------- | ------------------------------------- |
+| `symbol`     | VARCHAR(20) | NOT NULL  | Qlib 格式标的代码（如 `SH688041`）    |
+| `start_date` | VARCHAR(20) |           | 该标的数据起始日期                    |
+| `end_date`   | VARCHAR(20) |           | 该标的数据结束日期                    |
+| `vendor`     | VARCHAR(20) |           | 数据源标识                            |
+
+> **主键**：`symbol`
+
+**Python API：**
+
+```python
+from tradingagents.qlib.dolt_publisher import dolt_push
+
+# 推送全部缓存到 DoltHub
+result = dolt_push()
+print(f"{result.total_instruments} instruments, {result.total_rows:,} rows")
+
+# 仅推送指定股票
+result = dolt_push(tickers=["000858.SZ", "600519.SH"])
+
+# 仅本地提交，不推送（调试用）
+result = dolt_push(push=False, keep_tmp=True)
+```
+
+**在 DoltHub 上查询：**
+
+推送后可直接在 https://www.dolthub.com/repositories/rickqi/tradingagents 使用 SQL 查询：
+
+```sql
+-- 查看某只股票最近 5 天行情
+SELECT * FROM a_stock_eod_price
+WHERE symbol = 'SZ000858'
+ORDER BY tradedate DESC LIMIT 5;
+
+-- 查看某天所有股票涨幅
+SELECT symbol, open, close,
+       ROUND((close - open) / open * 100, 2) AS change_pct
+FROM a_stock_eod_price
+WHERE tradedate = '2026-05-08'
+ORDER BY change_pct DESC;
+
+-- 查看标的列表和数据覆盖范围
+SELECT * FROM stock_list ORDER BY symbol;
+
+-- 查看交易日历
+SELECT * FROM trade_calendar
+WHERE trade_date >= '2026-01-01'
+ORDER BY trade_date;
+```
 
 ### A 股市场支持
 
