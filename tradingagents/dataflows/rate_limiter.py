@@ -16,6 +16,7 @@ of the underlying API:
 | alpha_vantage | 0.5               | 5                  | Free tier: 5/min          |
 | twelve_data   | —                 | —                  | Has its own credit system |
 | opencli       | 0.5               | 60                 | Subprocess calls          |
+| tushare       | 0.3               | 120                | Pro API: 500/min base     |
 +---------------+-------------------+--------------------+---------------------------+
 
 Design decisions
@@ -171,6 +172,7 @@ _DEFAULT_LIMITS: dict[str, dict] = {
     "yfinance":      {"min_interval": 1.0, "calls_per_minute": 30},
     "alpha_vantage": {"min_interval": 0.5, "calls_per_minute": 5},
     "opencli":       {"min_interval": 0.5, "calls_per_minute": 60},
+    "tushare":       {"min_interval": 0.3, "calls_per_minute": 120},
 }
 
 _instance: Optional[VendorRateLimiter] = None

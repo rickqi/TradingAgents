@@ -261,7 +261,9 @@ def bulk_download(
         ticker_list = ticker_list[start_from:]
 
     # --- Download loop ---
-    result = BulkDownloadResult(total=total)
+    result = BulkDownloadResult(
+        total=total, downloaded=0, skipped=0, failed=0,
+    )
     batch_count = 0
 
     for idx, ticker in enumerate(ticker_list, start=1):

@@ -30,7 +30,7 @@
 ## 更新动态
 
 * [2026-05] 增加支持股票数据映射QLIB数据转换功能
-* [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加twelve data 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。新增 `qlib bulk-download` 全市场批量下载（腾讯 K 线，真实复权因子）、OHLCV 缓存自动保存、UA 轮换反爬策略。
+* [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare/tushare 数据供应商（tushare 提供日线行情、PE/PB/市值指标、全部财务报表），增加twelve data 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。新增 `qlib bulk-download` 全市场批量下载（腾讯 K 线，真实复权因子）、OHLCV 缓存自动保存、UA 轮换反爬策略。
 
 ![1778045286797.png](assets/README/1778045286797.png)
 
@@ -172,6 +172,8 @@ export DASHSCOPE_API_KEY=...       # Qwen (Alibaba DashScope)
 export ZHIPU_API_KEY=...           # GLM (Zhipu)
 export OPENROUTER_API_KEY=...      # OpenRouter
 export ALPHA_VANTAGE_API_KEY=...   # Alpha Vantage
+export TWELVE_DATA_API_KEY=...    # Twelve Data
+export TUSHARE_API_KEY=...        # Tushare Pro (需 pip install tushare)
 ```
 
 对于企业级供应商（如 Azure OpenAI、AWS Bedrock），将 `.env.enterprise.example` 复制为 `.env.enterprise` 并填入你的凭证。
@@ -567,7 +569,7 @@ config["max_recur_limit"] = 250         # LangGraph 递归限制（默认 250）
 
 #### 数据供应商配置
 
-支持 5 个数据供应商（`twelve_data`, `yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`），按类别配置，支持逗号分隔的降级链。默认回退顺序：**twelve_data → yfinance → alpha_vantage → tencent_sina → akshare**（Twelve Data REST API 优先，避免 yfinance 限速等待；免费版 8 API credits/分钟）。
+支持 6 个数据供应商（`twelve_data`, `yfinance`, `alpha_vantage`, `tencent_sina`, `akshare`, `tushare`），按类别配置，支持逗号分隔的降级链。默认回退顺序：**twelve_data → yfinance → alpha_vantage → tencent_sina → akshare**（Twelve Data REST API 优先，避免 yfinance 限速等待；免费版 8 API credits/分钟）。A 股模式下自动切换为 **tencent_sina → tushare → akshare**（tushare 提供 PE/PB/市值等基本面指标 + 全部财务报表）。
 
 ```python
 # 默认配置（twelve_data 优先，yfinance 作为降级）
@@ -581,11 +583,11 @@ config["data_vendors"] = {
 
 # A 股配置（自动检测中文股票代码时也会自动切换）
 config["data_vendors"] = {
-    "core_stock_apis": "tencent_sina",
-    "technical_indicators": "tencent_sina",
-    "fundamental_data": "tencent_sina,akshare",  # 降级链：先尝试 tencent_sina
+    "core_stock_apis": "tencent_sina,tushare",
+    "technical_indicators": "tushare,tencent_sina",        # tushare daily_basic: PE/PB/市值/换手率
+    "fundamental_data": "tushare,akshare,tencent_sina",    # tushare 财务报表优先
     "news_data": "tencent_sina",
-    "sentiment_data": "akshare",                  # 情绪数据仅 akshare
+    "sentiment_data": "akshare",                           # 情绪数据仅 akshare
 }
 
 # 工具级别覆盖（优先级高于类别配置）
