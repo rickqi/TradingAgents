@@ -1,0 +1,146 @@
+[
+  {
+    "ticker": "688012.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 616.7223646640778,
+    "error": null
+  },
+  {
+    "ticker": "603986.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 785.8082258701324,
+    "error": null
+  },
+  {
+    "ticker": "688008.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 546.4584403038025,
+    "error": null
+  },
+  {
+    "ticker": "300442.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 567.169412612915,
+    "error": null
+  },
+  {
+    "ticker": "603019.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 548.8341119289398,
+    "error": null
+  },
+  {
+    "ticker": "688111.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 528.1523685455322,
+    "error": null
+  },
+  {
+    "ticker": "002230.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 550.9008226394653,
+    "error": null
+  },
+  {
+    "ticker": "002837.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 615.1791839599609,
+    "error": null
+  },
+  {
+    "ticker": "002049.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 560.7858333587646,
+    "error": null
+  },
+  {
+    "ticker": "688027.SH",
+    "name": "",
+    "decision": "Sell",
+    "date": "2026-05-09",
+    "time": 679.6762228012085,
+    "error": null
+  },
+  {
+    "ticker": "300223.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 503.3142445087433,
+    "error": null
+  },
+  {
+    "ticker": "301269.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 521.3926134109497,
+    "error": null
+  },
+  {
+    "ticker": "002747.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 533.8155281543732,
+    "error": null
+  },
+  {
+    "ticker": "688332.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 562.5710000991821,
+    "error": null
+  },
+  {
+    "ticker": "002896.SZ",
+    "name": "",
+    "decision": "Sell",
+    "date": "2026-05-09",
+    "time": 556.4035198688507,
+    "error": null
+  },
+  {
+    "ticker": "688568.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 522.7802331447601,
+    "error": null
+  },
+  {
+    "ticker": "300672.SZ",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-05-09",
+    "time": 624.5800995826721,
+    "error": null
+  },
+  {
+    "ticker": "300458.SZ",
+    "name": "",
+    "decision": "Underweight",
+    "date": "2026-05-09",
+    "time": 575.5206968784332,
+    "error": null
+  }
+]
