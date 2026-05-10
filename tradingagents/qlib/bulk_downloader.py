@@ -127,13 +127,25 @@ def fetch_stock_universe(
         "fields": "f12,f13,f14",
     }
 
-    resp = requests.get(
-        _EASTMONEY_CLIST_URL,
-        params=params,
-        headers=_EASTMONEY_HEADERS,
-        timeout=30,
-    )
-    resp.raise_for_status()
+    for attempt in range(3):
+        try:
+            resp = requests.get(
+                _EASTMONEY_CLIST_URL,
+                params=params,
+                headers=_EASTMONEY_HEADERS,
+                timeout=60,
+            )
+            resp.raise_for_status()
+            break
+        except requests.RequestException as exc:
+            if attempt < 2:
+                logger.warning(
+                    "East Money universe fetch failed (attempt %d/3): %s — retrying in 5s",
+                    attempt + 1, exc,
+                )
+                time.sleep(5)
+            else:
+                raise
     payload = resp.json()
 
     items = payload.get("data", {}).get("diff", [])
