@@ -7,7 +7,7 @@ import typer
 from pathlib import Path
 from functools import wraps
 from rich.console import Console
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 # Load environment variables — try project root first (source runs), then CWD (pip-installed runs)
 _CLI_ROOT = Path(__file__).resolve().parent.parent  # project root when running from source
