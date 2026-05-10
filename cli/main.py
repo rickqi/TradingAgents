@@ -2339,7 +2339,7 @@ def report(
 def qlib(
     action: str = typer.Argument(
         ...,
-        help="操作: convert (OHLCV缓存→Qlib二进制), backfill-signals (JSON日志→信号文件), scan (扫描缓存)",
+        help="操作: scan (扫描缓存), convert (OHLCV缓存→Qlib二进制), backfill-signals (JSON日志→信号文件), bulk-download (批量下载A股OHLCV)",
     ),
     ticker: Optional[str] = typer.Option(
         None, "--ticker", "-t",
@@ -2366,6 +2366,8 @@ def qlib(
       tradingagents qlib convert -t 000858.SZ            # 单只股票
       tradingagents qlib convert --with-signals          # 含 AI 信号
       tradingagents qlib backfill-signals                # JSON 日志 → 信号文件
+      tradingagents qlib bulk-download                   # 批量下载全部A股 OHLCV
+      tradingagents qlib bulk-download -t 000858.SZ,600519.SH  # 指定股票下载
     """
     try:
         if action == "scan":
@@ -2443,9 +2445,48 @@ def qlib(
             save_signals_parquet(signals_df, output_path)
             console.print(f"[green]信号文件已保存:[/green] {output_path}")
 
+        elif action == "bulk-download":
+            from tradingagents.qlib.bulk_downloader import bulk_download
+
+            # Determine ticker list
+            ticker_list = None
+            if ticker:
+                ticker_list = [t.strip() for t in ticker.split(",") if t.strip()]
+
+            console.print("[cyan]Bulk downloading OHLCV data for A-share stocks...[/cyan]")
+
+            result = bulk_download(
+                tickers=ticker_list,
+                cache_dir=None,  # use default
+                skip_existing=True,
+                batch_size=20,
+                batch_pause=10.0,
+            )
+
+            # Print result table (same style as convert result)
+            table = Table(
+                title="批量下载结果",
+                show_header=True,
+                header_style="bold magenta",
+                box=box.ROUNDED,
+            )
+            table.add_column("指标", justify="left")
+            table.add_column("值", justify="left")
+
+            table.add_row("总计", str(result.total))
+            table.add_row("新下载", str(result.downloaded))
+            table.add_row("跳过(已缓存)", str(result.skipped))
+            table.add_row("失败", str(result.failed))
+            if result.failed_tickers:
+                preview = ", ".join(result.failed_tickers[:20])
+                suffix = "..." if len(result.failed_tickers) > 20 else ""
+                table.add_row("失败股票", f"{preview}{suffix}")
+
+            console.print(table)
+
         else:
             console.print(f"[red]Unknown action: {action}[/red]")
-            console.print("[dim]Valid actions: scan, convert, backfill-signals[/dim]")
+            console.print("[dim]Valid actions: scan, convert, backfill-signals, bulk-download[/dim]")
             raise typer.Exit(code=1)
 
     except typer.Exit:

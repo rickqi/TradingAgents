@@ -30,7 +30,7 @@
 ## 更新动态
 
 * [2026-05] 增加支持股票数据映射QLIB数据转换功能
-* [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加twelve data 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。
+* [2026-05] Fork 源项目增加对 **A 股支持** — 完整的 A 股市场分析，集成 tencent_sina/akshare 数据供应商，增加twelve data 数据供应商，增加[OpenCLI](https://www.npmjs.com/package/@jackwener/opencli) （需安装OpenCLI）提供 11 个数据工具（行情、K 线、资金流向、北向资金、板块、龙虎榜、热搜、指数面板、快讯、持仓、公告），支持中文股票代码自动识别、每个智能体的耗时统计面板、CLI 直接模式（`-t ticker` 跳过交互提示）、`screen` 候选股筛选和 `market` 实时数据命令，以及 CLI 中的流式报告展示。新增 `qlib bulk-download` 全市场批量下载（腾讯 K 线，真实复权因子）、OHLCV 缓存自动保存、UA 轮换反爬策略。
 
 ![1778045286797.png](assets/README/1778045286797.png)
 
@@ -305,9 +305,14 @@ tradingagents report reports/000858_20260506_143000 -t 000858.SZ -d 2026-05-06
 
 将已缓存的 OHLCV 数据和 AI 分析信号转换为 [Qlib](https://github.com/microsoft/qlib) 二进制格式，用于量化模型训练和回测。**无需安装 qlib 依赖**——转换使用纯 numpy 写入 Qlib 兼容的二进制文件。
 
-##### 三步流程
+##### 四步流程
 
 ```bash
+# 0. 批量下载（可选）— 从东方财富获取全市场 A 股列表，通过腾讯 K 线 API 下载 OHLCV
+tradingagents qlib bulk-download                           # 全市场 A 股（跳过已缓存）
+tradingagents qlib bulk-download -t 000858.SZ,600519.SH   # 指定股票
+# A 股分析时 OHLCV 也会自动缓存，此步骤用于批量预下载
+
 # 1. 扫描缓存 — 查看有哪些 OHLCV 数据可用
 tradingagents qlib scan                              # 查看全部
 tradingagents qlib scan -t 000858.SZ                 # 指定股票
@@ -325,8 +330,8 @@ tradingagents qlib backfill-signals                  # → signals.parquet
 
 | 选项               | 说明                                                                              |
 | ------------------ | --------------------------------------------------------------------------------- |
-| `action`         | 操作：`scan`（扫描缓存）、`convert`（转换）、`backfill-signals`（提取信号） |
-| `--ticker/-t`    | 指定股票代码（不指定则处理全部缓存）                                              |
+| `action`         | 操作：`scan`（扫描缓存）、`convert`（转换）、`backfill-signals`（提取信号）、`bulk-download`（批量下载 A 股 OHLCV） |
+| `--ticker/-t`    | 指定股票代码（不指定则处理全部缓存/全市场）                                       |
 | `--output/-o`    | 输出目录（默认 `~/.qlib/qlib_data/tradingagents`）                              |
 | `--with-signals` | convert 时同时合并 AI 分析信号                                                    |
 | `--freq`         | 数据频率（默认 `day`）                                                          |
@@ -334,6 +339,10 @@ tradingagents qlib backfill-signals                  # → signals.parquet
 ##### 数据流
 
 ```
+东方财富 API / 指定列表       →  bulk-download  →  ~/.tradingagents/cache/
+  全市场 A 股代码                                    {TICKER}-Tencent-data-*.csv
+  (腾讯 K 线 API, 真实复权因子)                       (OHLCV + Adj Close)
+
 ~/.tradingagents/cache/           →  convert  →  ~/.qlib/qlib_data/tradingagents/
   {TICKER}-Tencent-data-*.csv        calendars/day.txt
   {TICKER}-YFin-data-*.csv           instruments/all.txt
@@ -357,6 +366,13 @@ tradingagents qlib backfill-signals                  # → signals.parquet
 ```python
 from tradingagents.qlib.converter import QlibConverter
 from tradingagents.qlib.signal_extractor import extract_from_state, batch_extract_from_logs
+
+# 方式 0：批量下载 OHLCV（全市场或指定股票）
+from tradingagents.qlib.bulk_downloader import bulk_download, fetch_stock_universe
+result = bulk_download(tickers=["000858.SZ", "600519.SH"])  # 指定股票
+print(f"Downloaded: {result.downloaded}, Skipped: {result.skipped}, Failed: {result.failed}")
+# 或下载全市场（从东方财富 API 获取股票池）
+# result = bulk_download()  # 跳过已缓存，自动速率控制
 
 # 方式 1：从缓存转换（不含信号）
 converter = QlibConverter("~/.qlib/qlib_data/tradingagents", freq="day")

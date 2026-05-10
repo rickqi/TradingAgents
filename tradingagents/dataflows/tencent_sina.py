@@ -9,6 +9,7 @@ and news.  Insider transactions remain unavailable through free APIs.
 import json
 import logging
 import os
+import random
 import re
 import time
 from datetime import datetime
@@ -27,6 +28,31 @@ from .utils import safe_ticker_component
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Anti-scraping: Rotating User-Agent pool
+# ---------------------------------------------------------------------------
+
+_UA_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 OPR/111.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+]
+
+
+def _random_headers(base: dict | None = None) -> dict:
+    """Return headers dict with a randomly selected User-Agent."""
+    headers = dict(base) if base else {}
+    headers["User-Agent"] = random.choice(_UA_POOL)
+    return headers
+
+
+# ---------------------------------------------------------------------------
 # East Money API shared helpers
 # ---------------------------------------------------------------------------
 
@@ -42,11 +68,15 @@ def _api_get(url: str, headers: dict | None = None, timeout: int = 15,
 
     Retries up to *max_retries* times for HTTP 429 / 5xx responses.
     Other status codes raise immediately via ``raise_for_status()``.
+    Automatically rotates User-Agent on each attempt.
     """
-    _headers = headers or _EASTMONEY_HEADERS
+    _headers = _random_headers(headers or _EASTMONEY_HEADERS)
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
         try:
+            # Rotate UA on each retry attempt
+            if attempt > 0:
+                _headers["User-Agent"] = random.choice(_UA_POOL)
             resp = requests.get(url, headers=_headers, timeout=timeout)
             if resp.status_code == 429 and attempt < max_retries:
                 delay = base_delay * (2 ** attempt)
@@ -402,7 +432,65 @@ def get_YFin_data_online(
     header += f"# Total records: {len(df)}\n"
     header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
+    # Save to local cache for qlib conversion (P0: incremental cache)
+    _save_to_cache(symbol, start_date, end_date, csv_string, len(df))
+
     return header + csv_string
+
+
+# ---------------------------------------------------------------------------
+# Cache saving for qlib conversion
+# ---------------------------------------------------------------------------
+
+def _count_csv_rows(filepath: str) -> int:
+    """Count data rows in a CSV file (skip comment lines starting with #)."""
+    count = 0
+    with open(filepath, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            count += 1
+    # Subtract 1 for the header row
+    return max(count - 1, 0)
+
+
+def _save_to_cache(
+    ticker: str,
+    start_date: str,
+    end_date: str,
+    csv_data: str,
+    num_rows: int,
+) -> None:
+    """Save OHLCV data to local cache for qlib conversion.
+
+    Uses incremental logic: only writes if the file doesn't exist or the
+    new data has more rows than the existing file.
+    """
+    config = get_config()
+    cache_dir = config.get("data_cache_dir", "")
+    if not cache_dir:
+        return  # cache directory not configured
+
+    safe = safe_ticker_component(ticker)
+    filename = f"{safe}-Tencent-data-{start_date}-{end_date}.csv"
+    filepath = os.path.join(cache_dir, filename)
+
+    # Incremental: skip if existing file has equal or more data
+    if os.path.exists(filepath):
+        try:
+            existing_rows = _count_csv_rows(filepath)
+            if num_rows <= existing_rows:
+                return  # already cached with equal or more data
+        except OSError:
+            pass  # corrupted file, overwrite
+
+    os.makedirs(cache_dir, exist_ok=True)
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(csv_data)
+        logger.debug("Cached OHLCV data for %s: %d rows → %s", ticker, num_rows, filepath)
+    except OSError as exc:
+        logger.warning("Failed to cache OHLCV data for %s: %s", ticker, exc)
 
 
 # ---------------------------------------------------------------------------
