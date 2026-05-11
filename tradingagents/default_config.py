@@ -4,8 +4,47 @@ import sys
 
 _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 
+# Single source of truth for env-var → config-key overrides. To expose
+# a new config key for environment-based override, add a row here — no
+# entry-point script changes required. Coercion is driven by the type
+# of the existing default, so users can keep writing plain strings in
+# their .env file.
+_ENV_OVERRIDES = {
+    "TRADINGAGENTS_LLM_PROVIDER":         "llm_provider",
+    "TRADINGAGENTS_DEEP_THINK_LLM":       "deep_think_llm",
+    "TRADINGAGENTS_QUICK_THINK_LLM":      "quick_think_llm",
+    "TRADINGAGENTS_LLM_BACKEND_URL":      "backend_url",
+    "TRADINGAGENTS_OUTPUT_LANGUAGE":      "output_language",
+    "TRADINGAGENTS_MAX_DEBATE_ROUNDS":    "max_debate_rounds",
+    "TRADINGAGENTS_MAX_RISK_ROUNDS":      "max_risk_discuss_rounds",
+    "TRADINGAGENTS_CHECKPOINT_ENABLED":   "checkpoint_enabled",
+    "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
+}
+
+
+def _coerce(value: str, reference):
+    """Coerce env-var string to the type of the existing default value."""
+    if isinstance(reference, bool):
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    if isinstance(reference, int) and not isinstance(reference, bool):
+        return int(value)
+    if isinstance(reference, float):
+        return float(value)
+    return value
+
+
+def _apply_env_overrides(config: dict) -> dict:
+    """Apply TRADINGAGENTS_* env vars to the config dict in-place."""
+    for env_var, key in _ENV_OVERRIDES.items():
+        raw = os.environ.get(env_var)
+        if raw is None or raw == "":
+            continue
+        config[key] = _coerce(raw, config.get(key))
+    return config
+
+
 # Immutable template — never hand out references to the nested dicts.
-_DEFAULT_CONFIG_TEMPLATE = {
+_DEFAULT_CONFIG_TEMPLATE = _apply_env_overrides({
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", os.path.join(_TRADINGAGENTS_HOME, "logs")),
     "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", os.path.join(_TRADINGAGENTS_HOME, "cache")),
@@ -43,9 +82,24 @@ _DEFAULT_CONFIG_TEMPLATE = {
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 250,
+    # News / data fetching parameters
+    # Increase for longer lookback strategies or to broaden macro coverage;
+    # decrease to reduce token usage in agent prompts.
+    "news_article_limit": 20,             # max articles per ticker (ticker-news)
+    "global_news_article_limit": 10,      # max articles for global/macro news
+    "global_news_lookback_days": 7,       # macro news lookback window
+    # Search queries used by get_global_news for macro headlines. Extend or
+    # replace to broaden geographic / sector coverage.
+    "global_news_queries": [
+        "Federal Reserve interest rates inflation",
+        "S&P 500 earnings GDP economic outlook",
+        "geopolitical risk trade war sanctions",
+        "ECB Bank of England BOJ central bank policy",
+        "oil commodities supply chain energy",
+    ],
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
-    # Options per category: yfinance, alpha_vantage, tencent_sina, akshare, twelve_data
+    # Options per category: yfinance, alpha_vantage, tencent_sina, akshare, twelve_data, tushare
     # Comma-separated = fallback chain (first success wins)
     "data_vendors": {
         "core_stock_apis": "twelve_data,yfinance",
@@ -74,7 +128,24 @@ _DEFAULT_CONFIG_TEMPLATE = {
         # "alpha_vantage": {"min_interval": 0.5, "calls_per_minute": 5},
         # "opencli":       {"min_interval": 0.5, "calls_per_minute": 60},
     },
-}
+    # Benchmark for alpha calculation in the reflection layer.
+    # ``benchmark_ticker`` (when set) overrides the suffix map for all
+    # tickers; leave it None to use ``benchmark_map`` for auto-detection
+    # based on the ticker's exchange suffix. SPY remains the US default
+    # so the reflection label keeps reading "Alpha vs SPY" for US tickers
+    # while non-US tickers get their regional index automatically.
+    "benchmark_ticker": None,
+    "benchmark_map": {
+        ".NS":  "^NSEI",    # NSE India (Nifty 50)
+        ".BO":  "^BSESN",   # BSE India (Sensex)
+        ".T":   "^N225",    # Tokyo (Nikkei 225)
+        ".HK":  "^HSI",     # Hong Kong (Hang Seng)
+        ".L":   "^FTSE",    # London (FTSE 100)
+        ".TO":  "^GSPTSE",  # Toronto (TSX Composite)
+        ".AX":  "^AXJO",    # Australia (ASX 200)
+        "":     "SPY",      # default for US-listed tickers (no suffix)
+    },
+})
 
 
 def get_default_config() -> dict:

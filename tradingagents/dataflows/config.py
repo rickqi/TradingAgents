@@ -1,6 +1,8 @@
 import copy
-import tradingagents.default_config as default_config
+
 from typing import Dict, Optional
+
+import tradingagents.default_config as default_config
 
 # Use default config but allow it to be overridden
 _config: Optional[Dict] = None
@@ -14,16 +16,20 @@ def initialize_config():
 
 
 def set_config(config: Dict):
-    """Replace the configuration with a fresh template merged with *config*.
+    """Update the configuration with custom values.
 
-    Every call starts from a clean deepcopy of DEFAULT_CONFIG_TEMPLATE so
-    that leftover values from a previous analysis run cannot leak into the
-    next one.  This is critical because the CLI runs multiple analyses in a
-    single process (e.g. batch_analyze.py or repeated TUI runs).
+    Dict-valued keys (e.g. ``data_vendors``) are merged one level deep so a
+    partial update like ``{"data_vendors": {"core_stock_apis": "alpha_vantage"}}``
+    keeps the other nested keys from the default; scalar keys are replaced.
     """
     global _config
-    _config = copy.deepcopy(default_config.DEFAULT_CONFIG)
-    _config.update(config)
+    initialize_config()
+    incoming = copy.deepcopy(config)
+    for key, value in incoming.items():
+        if isinstance(value, dict) and isinstance(_config.get(key), dict):
+            _config[key].update(value)
+        else:
+            _config[key] = value
 
 
 def get_config() -> Dict:
@@ -34,7 +40,7 @@ def get_config() -> Dict:
     """
     if _config is None:
         initialize_config()
-    return _config.copy()
+    return copy.deepcopy(_config)
 
 
 def reset_config():
