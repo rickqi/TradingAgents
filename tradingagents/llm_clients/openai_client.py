@@ -193,7 +193,6 @@ _PROVIDER_BASE_URL = {
     "openrouter": "https://openrouter.ai/api/v1",
     "ollama":     "http://localhost:11434/v1",
 }
-}
 
 
 def _resolve_provider_base_url(provider: str) -> Optional[str]:

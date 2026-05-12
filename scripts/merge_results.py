@@ -1,13 +1,9 @@
 """Merge batch_results_A.json + batch_results_B.json + batch_20_results.json into final."""
-import json, math, os
+import json, math, os, sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TICKER_ORDER = [
-    "688041.SH", "688256.SH", "688012.SH", "603986.SH", "688008.SH",
-    "300442.SZ", "603019.SH", "688111.SH", "002230.SZ", "002837.SZ",
-    "002049.SZ", "688027.SH", "300223.SZ", "301269.SZ", "002747.SZ",
-    "688332.SH", "002896.SZ", "688568.SH", "300672.SZ", "300458.SZ",
-]
+sys.path.insert(0, os.path.join(SCRIPT_DIR, "..", "..", "docs", "scripts"))
+from stocks_config import STOCKS_ORDER as TICKER_ORDER
 
 
 def load_json(path):
