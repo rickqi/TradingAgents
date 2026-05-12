@@ -194,5 +194,53 @@
     "date": "2026-05-11",
     "time": 2.2,
     "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688041.SH",
+    "name": "海光信息",
+    "decision": "Hold",
+    "date": "2026-05-12",
+    "time": 594.5,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "688256.SH",
+    "name": "寒武纪",
+    "decision": "Hold",
+    "date": "2026-05-12",
+    "time": 734.0,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "688012.SH",
+    "name": "中微公司",
+    "decision": "Hold",
+    "date": "2026-05-12",
+    "time": 575.8,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": -1,
+    "price_target": 412.0
+  },
+  {
+    "ticker": "603986.SH",
+    "name": "兆易创新",
+    "decision": "Hold",
+    "date": "2026-05-12",
+    "time": 569.4,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
   }
 ]
