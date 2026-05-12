@@ -10,6 +10,7 @@ Key modules:
 - :mod:`cache_scanner` — Discover cached OHLCV CSV files on disk
 - :mod:`converter` — Convert OHLCV DataFrames to Qlib binary format
 - :mod:`signal_extractor` — Extract AI trading signals from analysis results
+- :mod:`ta_dolt_publisher` — Publish TA AI signals to DoltHub
 """
 
 from tradingagents.qlib.ticker_mapper import (
