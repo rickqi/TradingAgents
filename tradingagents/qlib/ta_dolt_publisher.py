@@ -252,16 +252,20 @@ def build_version_record(
     }
 
 
+# ── Persistent repo directory ────────────────────────────────────────────
+_PERSISTENT_REPO_DIR = Path.home() / ".dolt" / "ta_publisher" / "tradingagents"
+
+
 # ── Dolt publish ───────────────────────────────────────────────────────────
 def _dolt_publish_ta(
     dolt_exe: str,
     signals_csv: str,
     version_csv: str,
-    tmpdir: str,
     push: bool = True,
+    fresh_clone: bool = False,
 ) -> TAPublishResult:
-    """Clone DoltHub repo, create tables, import CSV, commit, and push."""
-    repo_dir = os.path.join(tmpdir, "tradingagents")
+    """Clone/pull DoltHub repo, create tables, import CSV, commit, and push."""
+    repo_dir = str(_PERSISTENT_REPO_DIR)
     num_signals = 0
 
     # Read signals count from CSV
@@ -272,31 +276,42 @@ def _dolt_publish_ta(
     signals_df = pd.read_csv(signals_csv, nrows=1, encoding="utf-8")
     trade_date = signals_df["trade_date"].iloc[0] if not signals_df.empty else ""
 
-    # ── Clone or init ─────────────────────────────────────────
+    # ── Clone, pull, or init ──────────────────────────────────
     print(f"\n{'='*60}")
-    print("  Initialize Dolt repo")
+    print("  Initialize Dolt repo (persistent)")
     print(f"{'='*60}")
-    if os.path.isdir(repo_dir):
-        shutil.rmtree(repo_dir, ignore_errors=True)
-    os.makedirs(repo_dir, exist_ok=True)
 
-    clone_result = _dolt(dolt_exe, "clone", DOLTHUB_REMOTE, repo_dir, check=False)
-    if clone_result.returncode != 0:
-        if os.path.isdir(repo_dir):
-            shutil.rmtree(repo_dir, ignore_errors=True)
+    has_dolt_dir = os.path.isdir(os.path.join(repo_dir, ".dolt"))
+
+    if fresh_clone and os.path.isdir(repo_dir):
+        print(f"  [fresh-clone] Removing existing repo: {repo_dir}")
+        shutil.rmtree(repo_dir, ignore_errors=True)
+        has_dolt_dir = False
+
+    if has_dolt_dir:
+        # Existing persistent repo — pull latest (fast, only diffs)
+        print(f"  Existing repo found — pulling latest changes")
+        _dolt(dolt_exe, "pull", "origin", "main", cwd=repo_dir, check=False)
+    else:
+        # Fresh clone
         os.makedirs(repo_dir, exist_ok=True)
-        print("  Remote empty or not clonable -- initializing locally")
-        _dolt(
-            dolt_exe,
-            "init", "--name", "rickqi", "--email", "rickqi@users.noreply.github.com",
-            cwd=repo_dir,
-        )
-        _dolt(
-            dolt_exe,
-            "remote", "add", "origin",
-            f"https://doltremoteapi.dolthub.com/{DOLTHUB_REMOTE}",
-            cwd=repo_dir,
-        )
+        clone_result = _dolt(dolt_exe, "clone", DOLTHUB_REMOTE, repo_dir, check=False)
+        if clone_result.returncode != 0:
+            if os.path.isdir(repo_dir):
+                shutil.rmtree(repo_dir, ignore_errors=True)
+            os.makedirs(repo_dir, exist_ok=True)
+            print("  Remote empty or not clonable -- initializing locally")
+            _dolt(
+                dolt_exe,
+                "init", "--name", "rickqi", "--email", "rickqi@users.noreply.github.com",
+                cwd=repo_dir,
+            )
+            _dolt(
+                dolt_exe,
+                "remote", "add", "origin",
+                f"https://doltremoteapi.dolthub.com/{DOLTHUB_REMOTE}",
+                cwd=repo_dir,
+            )
     print(f"  Repo dir: {repo_dir}")
 
     # ── Create tables ──────────────────────────────────────────
@@ -573,14 +588,19 @@ def ta_dolt_push(
     results_path: str | None = None,
     push: bool = True,
     keep_tmp: bool = False,
+    fresh_clone: bool = False,
     model_name: str = "deepseek-v4-flash",
     analysts: str = "market,social,news,fundamentals",
 ) -> TAPublishResult | None:
     """Publish TA AI signals to DoltHub.
 
     Reads ``batch_20_results.json``, filters out errors, builds signal
-    and version DataFrames, exports to CSV, then clones the DoltHub repo,
-    creates/updates tables, commits and pushes.
+    and version DataFrames, exports to CSV, then clones/pulls the DoltHub
+    repo, creates/updates tables, commits and pushes.
+
+    Uses a persistent local repo at ``~/.dolt/ta_publisher/tradingagents/``
+    to avoid re-cloning the entire remote on every run.  Subsequent runs
+    only pull the diff (seconds instead of minutes).
 
     Parameters
     ----------
@@ -590,6 +610,10 @@ def ta_dolt_push(
         If ``True``, push to DoltHub after committing.
     keep_tmp:
         Keep temp directory after completion (for debugging).
+    fresh_clone:
+        If ``True``, delete the persistent local repo and re-clone
+        from scratch.  Use when the local repo is corrupted or out
+        of sync.
     model_name:
         LLM model name to record in the signal metadata.
     analysts:
@@ -643,7 +667,7 @@ def ta_dolt_push(
         print(f"  CSV: {signals_csv}")
         print(f"  CSV: {version_csv}")
 
-        result = _dolt_publish_ta(dolt_exe, signals_csv, version_csv, tmpdir, push=push)
+        result = _dolt_publish_ta(dolt_exe, signals_csv, version_csv, push=push, fresh_clone=fresh_clone)
         return result
     finally:
         if not keep_tmp:
