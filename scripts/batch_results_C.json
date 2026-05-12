@@ -1,0 +1,98 @@
+[
+  {
+    "ticker": "300223.SZ",
+    "name": "北京君正",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.7,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "301269.SZ",
+    "name": "联特科技",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.3,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "002747.SZ",
+    "name": "尚太科技",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 0.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688332.SH",
+    "name": "联影医疗",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.3,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "002896.SZ",
+    "name": "星帅尔",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.3,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688568.SH",
+    "name": "中科星图",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 0.4,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "300223.SZ",
+    "name": "北京君正",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.9,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "301269.SZ",
+    "name": "联特科技",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.7,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "002747.SZ",
+    "name": "尚太科技",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.8,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688332.SH",
+    "name": "联影医疗",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.1,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "002896.SZ",
+    "name": "星帅尔",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688568.SH",
+    "name": "中科星图",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.3,
+    "error": "unsupported format string passed to NoneType.__format__"
+  }
+]

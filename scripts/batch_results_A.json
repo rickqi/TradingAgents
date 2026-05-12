@@ -1,0 +1,198 @@
+[
+  {
+    "ticker": "688041.SH",
+    "name": "海光信息",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-08",
+    "time": 1.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "603986.SH",
+    "name": "兆易创新",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-08",
+    "time": 1.2,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688008.SH",
+    "name": "澜起科技",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 687.2,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300442.SZ",
+    "name": "普丽盛",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 637.1,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "603019.SH",
+    "name": "中科曙光",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 603.6,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": 105.0
+  },
+  {
+    "ticker": "688111.SH",
+    "name": "金山办公",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 600.1,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": 300.0
+  },
+  {
+    "ticker": "002230.SZ",
+    "name": "科大讯飞",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 644.6,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": 0,
+    "price_target": 51.6
+  },
+  {
+    "ticker": "002837.SZ",
+    "name": "英维克",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 674.6,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "002049.SZ",
+    "name": "紫光国微",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 825.6,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": -2,
+    "price_target": 78.0
+  },
+  {
+    "ticker": "688041.SH",
+    "name": "海光信息",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-08",
+    "time": 0.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688256.SH",
+    "name": "寒武纪",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-08",
+    "time": 0.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688012.SH",
+    "name": "中微公司",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-08",
+    "time": 0.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "603986.SH",
+    "name": "兆易创新",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-08",
+    "time": 0.4,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688041.SH",
+    "name": "海光信息",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.7,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688256.SH",
+    "name": "寒武纪",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688012.SH",
+    "name": "中微公司",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.4,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "603986.SH",
+    "name": "兆易创新",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.4,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688041.SH",
+    "name": "海光信息",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 3.0,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688256.SH",
+    "name": "寒武纪",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.7,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688012.SH",
+    "name": "中微公司",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.8,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "603986.SH",
+    "name": "兆易创新",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.2,
+    "error": "unsupported format string passed to NoneType.__format__"
+  }
+]
