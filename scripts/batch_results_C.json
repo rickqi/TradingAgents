@@ -166,5 +166,41 @@
     "trader_action": 0,
     "research_rating": 0,
     "price_target": NaN
+  },
+  {
+    "ticker": "300672.SZ",
+    "name": "国科微",
+    "decision": "Hold",
+    "date": "2026-05-13",
+    "time": 535.3,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300458.SZ",
+    "name": "全志科技",
+    "decision": "Hold",
+    "date": "2026-05-13",
+    "time": 446.6,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "688295.SH",
+    "name": "中复神鹰",
+    "decision": "Hold",
+    "date": "2026-05-13",
+    "time": 429.5,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
   }
 ]
