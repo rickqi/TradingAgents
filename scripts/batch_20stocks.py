@@ -38,33 +38,18 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.qlib.signal_extractor import extract_from_state
 
-# ── 20 target stocks ──
-STOCKS = [
-    "688041.SH", "688256.SH", "688012.SH", "603986.SH", "688008.SH",
-    "300442.SZ", "603019.SH", "688111.SH", "002230.SZ", "002837.SZ",
-    "002049.SZ", "688027.SH", "300223.SZ", "301269.SZ", "002747.SZ",
-    "688332.SH", "002896.SZ", "688568.SH", "300672.SZ", "300458.SZ",
-]
-
-STOCK_NAMES = {
-    "688041.SH": "海光信息", "688256.SH": "寒武纪", "688012.SH": "中微公司",
-    "603986.SH": "兆易创新", "688008.SH": "澜起科技", "300442.SZ": "普丽盛",
-    "603019.SH": "中科曙光", "688111.SH": "金山办公", "002230.SZ": "科大讯飞",
-    "002837.SZ": "英维克", "002049.SZ": "紫光国微", "688027.SH": "天合光能",
-    "300223.SZ": "北京君正", "301269.SZ": "联特科技", "002747.SZ": "尚太科技",
-    "688332.SH": "联影医疗", "002896.SZ": "星帅尔", "688568.SH": "中科星图",
-    "300672.SZ": "国科微", "300458.SZ": "全志科技",
-}
-
-DATE = "2026-05-08"
+# Load shared stock config
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "scripts"))
+from stocks_config import STOCKS, STOCK_NAMES, ANALYSIS_DATE as DATE
 _DEFAULT_RESULTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "batch_20_results.json")
 
 
-def build_config():
+def build_config(model=None, debate_rounds=1):
     config = DEFAULT_CONFIG.copy()
     config["llm_provider"] = "deepseek"
-    config["deep_think_llm"] = "deepseek-v4-flash"
-    config["quick_think_llm"] = "deepseek-v4-flash"
+    model_name = model or "deepseek-v4-flash"
+    config["deep_think_llm"] = model_name
+    config["quick_think_llm"] = model_name
     config["data_vendors"] = {
         "core_stock_apis": "tencent_sina",
         "technical_indicators": "tencent_sina",
@@ -72,8 +57,8 @@ def build_config():
         "news_data": "tencent_sina",
         "sentiment_data": "akshare",
     }
-    config["max_debate_rounds"] = 1
-    config["max_risk_discuss_rounds"] = 1
+    config["max_debate_rounds"] = debate_rounds
+    config["max_risk_discuss_rounds"] = debate_rounds
     config["output_language"] = "Chinese"
     return config
 
@@ -101,6 +86,12 @@ def main():
     parser.add_argument("--only", nargs="+", help="Only analyze these tickers")
     parser.add_argument("--date", default=DATE, help="Analysis date")
     parser.add_argument("--output", default=None, help="Custom results file path (default: batch_20_results.json)")
+    parser.add_argument("--analysts", default=None,
+        help="Comma-separated analyst list: market,social,news,fundamentals (default: all)")
+    parser.add_argument("--model", default=None,
+        help="Override LLM model for both deep and quick thinking (default: deepseek-v4-flash)")
+    parser.add_argument("--debate-rounds", type=int, default=1,
+        help="Number of research and risk debate rounds (default: 1)")
     args = parser.parse_args()
 
     # Determine stock list
@@ -111,17 +102,27 @@ def main():
 
     results_file = args.output or _DEFAULT_RESULTS
 
+    # Determine analyst selection
+    selected_analysts = (
+        [a.strip() for a in args.analysts.split(",") if a.strip()]
+        if args.analysts
+        else ["market", "social", "news", "fundamentals"]
+    )
+    model_display = args.model or "deepseek-v4-flash"
+
     print(f"{'=' * 60}")
     print(f"TradingAgents Batch Analysis")
     print(f"  Stocks: {len(stocks)}")
     print(f"  Date: {args.date}")
-    print(f"  LLM: deepseek-v4-flash")
+    print(f"  LLM: {model_display}")
+    print(f"  Analysts: {', '.join(selected_analysts)}")
+    print(f"  Debate rounds: {args.debate_rounds}")
     print(f"  Results: {results_file}")
     print(f"{'=' * 60}")
 
-    config = build_config()
+    config = build_config(model=args.model, debate_rounds=args.debate_rounds)
     print("Initializing TradingAgentsGraph...")
-    ta = TradingAgentsGraph(debug=False, config=config)
+    ta = TradingAgentsGraph(selected_analysts=selected_analysts, debug=False, config=config)
 
     # Load results from the specified file
     p = Path(results_file)
@@ -183,7 +184,18 @@ def main():
         results.append(result)
         with open(results_file, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
-        print(f"  (Saved, {len(results)} total, {errors} errors)")
+
+        # ETA progress
+        done_count = sum(1 for r in results if not r.get("error"))
+        err_count = sum(1 for r in results if r.get("error"))
+        total_done = done_count + err_count
+        if total_done > 0:
+            elapsed_total = time.time() - total_start
+            avg_s = elapsed_total / total_done
+            remaining = (len(stocks) - total_done) * avg_s
+            print(f"  Progress: {total_done}/{len(stocks)} | "
+                  f"Avg: {avg_s:.0f}s/stock | "
+                  f"ETA: {remaining/60:.1f}min remaining")
 
     total_elapsed = time.time() - total_start
     done_now = completed_tickers(results)

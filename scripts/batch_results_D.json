@@ -1,0 +1,146 @@
+[
+  {
+    "ticker": "300672.SZ",
+    "name": "国科微",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.6,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "300458.SZ",
+    "name": "全志科技",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688295.SH",
+    "name": "中复神鹰",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 1.2,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "300672.SZ",
+    "name": "国科微",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.9,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "300458.SZ",
+    "name": "全志科技",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.4,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "688295.SH",
+    "name": "中复神鹰",
+    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
+    "date": "2026-05-11",
+    "time": 2.5,
+    "error": "unsupported format string passed to NoneType.__format__"
+  },
+  {
+    "ticker": "300672.SZ",
+    "name": "国科微",
+    "decision": "Hold",
+    "date": "2026-05-12",
+    "time": 551.9,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300458.SZ",
+    "name": "全志科技",
+    "decision": "Hold",
+    "date": "2026-05-12",
+    "time": 683.7,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "688295.SH",
+    "name": "中复神鹰",
+    "decision": "Hold",
+    "date": "2026-05-12",
+    "time": 617.5,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300857.SZ",
+    "name": "协创数据",
+    "decision": "Underweight",
+    "date": "2026-05-13",
+    "time": 454.7,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "002714.SZ",
+    "name": "牧原股份",
+    "decision": "Hold",
+    "date": "2026-05-13",
+    "time": 521.4,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "159636.SZ",
+    "name": "港股通科技30ETF工银",
+    "decision": "Hold",
+    "date": "2026-05-13",
+    "time": 391.4,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "600111.SH",
+    "name": "北方稀土",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 430.1,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": 50.75
+  },
+  {
+    "ticker": "002460.SZ",
+    "name": "赣锋锂业",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 434.9,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": 0,
+    "research_rating": -1,
+    "price_target": 78.0
+  }
+]

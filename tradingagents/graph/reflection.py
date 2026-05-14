@@ -43,20 +43,19 @@ class Reflector:
         for US tickers, ``"^N225"`` for ``.T`` listings); defaults to SPY for
         callers that haven't been updated to thread the benchmark through.
         """
+        # Format returns safely — _fetch_returns may return None if price
+        # data is not yet available (e.g. A-share where benchmark fetch fails).
+        raw_fmt = f"{raw_return:+.1%}" if raw_return is not None else "N/A"
+        alpha_fmt = f"{alpha_return:+.1%}" if alpha_return is not None else "N/A"
         messages = [
             ("system", self.log_reflection_prompt),
             (
                 "human",
                 (
-                    f"Raw return: {raw_return:+.1%}\n" if raw_return is not None
-                    else "Raw return: N/A\n"
-                )
-                + (
-                    f"Alpha vs {benchmark_name}: {alpha_return:+.1%}\n\n"
-                    if alpha_return is not None
-                    else f"Alpha vs {benchmark_name}: N/A\n\n"
-                )
-                + f"Final Decision:\n{final_decision}",
+                    f"Raw return: {raw_fmt}\n"
+                    f"Alpha vs {benchmark_name}: {alpha_fmt}\n\n"
+                    f"Final Decision:\n{final_decision}"
+                ),
             ),
         ]
         return self.quick_thinking_llm.invoke(messages).content

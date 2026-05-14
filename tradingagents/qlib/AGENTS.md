@@ -12,7 +12,8 @@ qlib/
 ├── converter.py             # QlibConverter + ConvertResult，OHLCV → Qlib 二进制
 ├── signal_extractor.py      # 从分析状态/JSON 日志提取 AI 信号
 ├── bulk_downloader.py       # 批量下载 A 股 OHLCV（腾讯 K 线 + 东方财富股票池）
-└── dolt_publisher.py        # 缓存去重 → DoltHub 推送（dolt CLI）
+├── dolt_publisher.py        # 缓存去重 → DoltHub 推送（dolt CLI）
+└── ta_dolt_publisher.py     # TA AI 信号 → DoltHub 推送 + 版本对比
 ```
 
 ## Ticker 格式对照表
@@ -145,8 +146,38 @@ qlib/
 | `a_stock_eod_price` | (tradedate, symbol) | tradedate DATE, symbol VARCHAR(20), open/high/low/close/volume DOUBLE, adjclose DOUBLE, vendor VARCHAR(20) |
 | `trade_calendar` | trade_date | trade_date VARCHAR(20), is_open INT |
 | `stock_list` | symbol | symbol VARCHAR(20), start_date, end_date, vendor |
+| `ta_signals` | (trade_date, symbol) | trade_date VARCHAR(20), symbol VARCHAR(20), ai_score/trader_action/research_rating INT, decision VARCHAR(20), price_target DOUBLE, model_name VARCHAR(50), provider VARCHAR(20), analysts VARCHAR(100), debate_rounds INT, analysis_time_sec DOUBLE, created_at VARCHAR(30) |
+| `ta_signal_version` | version_id | version_id VARCHAR(40), trade_date VARCHAR(20), tickers_hash VARCHAR(64), num_signals INT, model_name VARCHAR(50), analysts VARCHAR(100), commit_hash VARCHAR(20), created_at VARCHAR(30) |
 
 推送流程：`dolt clone` → `CREATE TABLE` → `dolt table import -u`（分块 CSV）→ `dolt commit` → `dolt push`。`dolt log --format=%H` 不受支持，代码通过正则解析输出并清理 ANSI 转义码获取 commit hash。
+
+### ta_dolt_publisher.py
+
+`TAPublishResult` 数据类：num_signals, trade_date, pushed, commit_hash, repo_dir。
+`VersionStatus` 常量类：MATCH, DATE_MISMATCH, TICKERS_MISMATCH, DIVERGED, NO_REMOTE。
+
+| 函数 | 作用 |
+|------|------|
+| `ta_dolt_push(results_path, push, keep_tmp, model_name, analysts)` | 主入口：读 batch_20_results.json → 过滤错误 → 构建 ta_signals + ta_signal_version DataFrame → CSV → dolt clone/建表/import/commit/push |
+| `check_remote_signals(results_path, repo, branch)` | 对比本地 TA 信号与 DoltHub 远程版本。通过 SQL API 查询，返回 VersionStatus + 差异详情 |
+| `query_dolthub(sql, repo, branch)` | DoltHub SQL API 查询（HTTPS，无需 dolt CLI） |
+| `load_ta_results(results_path)` | 读取 batch_20_results.json，过滤 error 条目 |
+| `build_signals_df(results, ...)` | 构建 ta_signals 表 DataFrame |
+| `build_version_record(results, ...)` | 构建 ta_signal_version 单行记录 |
+
+数据流：
+```
+batch_20_results.json → load_ta_results() → build_signals_df() + build_version_record()
+    → CSV → _dolt_publish_ta() → DoltHub (ta_signals + ta_signal_version)
+```
+
+客户端版本对比逻辑：
+1. 读本地 results → 取 trade_date + tickers MD5 hash
+2. 查 DoltHub `SELECT * FROM ta_signal_version ORDER BY created_at DESC LIMIT 1`
+3. 对比日期 → tickers hash → 逐条信号（ai_score, trader_action, research_rating）
+4. 返回 VersionStatus 状态 + differences 列表
+
+导入关系：`ta_dolt_publisher` 导入 `dolt_publisher.TABLE_SCHEMAS` 以确保 OHLCV 表在 clone 后也正确创建。
 
 ## 去重逻辑
 
@@ -177,3 +208,5 @@ qlib/
 - 不要在 `extra_features` 的 key 格式上只尝试一种格式（converter 需同时尝试 TradingAgents 和 Qlib 两种 key）
 - 不要用 `dolt log --format=%H`（不支持），用正则解析 `dolt log -n 1` 输出
 - 不要忘记 DoltHub 推送时处理 ANSI 转义码（`re.sub(r"\x1b\[[0-9;]*m", ...)`）
+- 不要在 `ta_dolt_publisher` 中导入 `signal_extractor`——直接读取 `batch_20_results.json`
+- 不要让 `check_remote_signals()` 抛异常——DoltHub 查询失败时返回 `NO_REMOTE` + error 字段

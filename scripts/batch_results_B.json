@@ -1,0 +1,122 @@
+[
+  {
+    "ticker": "688027.SH",
+    "name": "天合光能",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 548.5,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": 550.0
+  },
+  {
+    "ticker": "300223.SZ",
+    "name": "北京君正",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 618.1,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 1,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "301269.SZ",
+    "name": "联特科技",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 505.6,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "002747.SZ",
+    "name": "尚太科技",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 463.5,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": 26.47
+  },
+  {
+    "ticker": "688332.SH",
+    "name": "联影医疗",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 619.1,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "002896.SZ",
+    "name": "星帅尔",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 522.3,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": 80.47
+  },
+  {
+    "ticker": "688568.SH",
+    "name": "中科星图",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 607.6,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300672.SZ",
+    "name": "国科微",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 595.3,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300458.SZ",
+    "name": "全志科技",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 680.1,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "688295.SH",
+    "name": "中复神鹰",
+    "decision": "Underweight",
+    "date": "2026-05-08",
+    "time": 513.3,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": 49.95
+  }
+]

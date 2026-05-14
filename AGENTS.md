@@ -97,6 +97,16 @@ python scripts/test_datasource.py                          # API 连通性测试
 python scripts/smoke_structured_output.py deepseek          # 结构化输出冒烟测试
 ```
 
+**融合预测全流程**（Qlib + TradingAgents → 21 股 × 20 天价格预测）：
+```bash
+# 一键运行（推荐并行 2 组）
+python D:\codes\stock\docs\scripts\run_full_pipeline.py --parallel 2
+
+# 仅重新预测（跳过 TA 分析）
+python D:\codes\stock\docs\scripts\run_full_pipeline.py --skip-ta
+```
+详见 `docs/scripts/README.md`。
+
 ## 测试
 
 ```bash

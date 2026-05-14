@@ -35,6 +35,31 @@ def _get_opencli_path() -> Optional[str]:
     return shutil.which("opencli")
 
 
+def _strip_exchange_suffix(ticker: str) -> str:
+    """Strip exchange suffix (.SH/.SZ/.SS/.HK) from a single ticker.
+
+    OpenCLI expects plain 6-digit A-share codes (e.g. ``688041``),
+    not the TradingAgents format with exchange suffix (``688041.SH``).
+    """
+    t = ticker.strip()
+    for suffix in (".SH", ".SZ", ".SS", ".HK", ".sh", ".sz", ".ss", ".hk"):
+        if t.endswith(suffix):
+            return t[:-len(suffix)]
+    return t
+
+
+def _normalize_symbols(symbols: str) -> str:
+    """Normalize a comma-separated symbol list by stripping exchange suffixes.
+
+    Handles both single symbols (``"688041.SH"``) and comma-separated
+    (``"600519.SH,000858.SZ"``).
+    """
+    if not symbols:
+        return symbols
+    parts = [_strip_exchange_suffix(s) for s in symbols.split(",")]
+    return ",".join(parts)
+
+
 def _run_opencli(
     site: str,
     command: str,
@@ -285,7 +310,8 @@ def get_quote(
     if _get_opencli_path() is None:
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
 
-    args = [symbols] if symbols else []
+    normalized = _normalize_symbols(symbols) if symbols else ""
+    args = [normalized] if normalized else []
 
     try:
         data = _run_opencli("eastmoney", "quote", args, timeout=15)
@@ -314,7 +340,7 @@ def get_kline(
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
 
     args = [
-        symbol,
+        _strip_exchange_suffix(symbol),
         "--period", period,
         "--adjust", adjust,
         "--limit", str(limit),
@@ -345,7 +371,7 @@ def get_holders(
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
 
     args = [
-        symbol,
+        _strip_exchange_suffix(symbol),
         "--limit", str(limit),
     ]
 

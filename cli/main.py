@@ -2382,7 +2382,7 @@ def report(
 def qlib(
     action: str = typer.Argument(
         ...,
-        help="操作: scan (扫描缓存), convert (OHLCV缓存→Qlib二进制), backfill-signals (JSON日志→信号文件), bulk-download (批量下载A股OHLCV), dolt-push (缓存→DoltHub推送)",
+        help="操作: scan, convert, backfill-signals, bulk-download, dolt-push, ta-push, check-remote",
     ),
     ticker: Optional[str] = typer.Option(
         None, "--ticker", "-t",
@@ -2426,6 +2426,9 @@ def qlib(
       tradingagents qlib dolt-push                       # 缓存 → DoltHub 推送
       tradingagents qlib dolt-push -t 000858.SZ          # 指定股票推送
       tradingagents qlib dolt-push --no-push             # 仅本地提交，不推送
+      tradingagents qlib ta-push                         # TA AI 信号 → DoltHub
+      tradingagents qlib ta-push --no-push               # 仅本地提交
+      tradingagents qlib check-remote                    # 对比本地与远程 TA 信号版本
     """
     try:
         if action == "scan":
@@ -2576,9 +2579,106 @@ def qlib(
 
             console.print(table)
 
+        elif action == "ta-push":
+            from tradingagents.qlib.ta_dolt_publisher import ta_dolt_push
+
+            console.print("[cyan]Publishing TA AI signals to DoltHub...[/cyan]")
+
+            result = ta_dolt_push(
+                push=not no_push,
+                keep_tmp=keep_tmp,
+            )
+
+            if result is None:
+                console.print("[yellow]No valid TA signals to publish.[/yellow]")
+                return
+
+            table = Table(
+                title="TA 信号推送结果",
+                show_header=True,
+                header_style="bold magenta",
+                box=box.ROUNDED,
+            )
+            table.add_column("指标", justify="left")
+            table.add_column("值", justify="left")
+
+            table.add_row("信号条数", str(result.num_signals))
+            table.add_row("交易日期", result.trade_date)
+            table.add_row("已推送", "Yes" if result.pushed else "No (--no-push)")
+            if result.commit_hash:
+                table.add_row("Commit", result.commit_hash)
+            table.add_row("DoltHub", f"https://www.dolthub.com/repositories/rickqi/tradingagents")
+
+            console.print(table)
+
+        elif action == "check-remote":
+            from tradingagents.qlib.ta_dolt_publisher import check_remote_signals, VersionStatus
+
+            console.print("[cyan]Comparing local TA signals with DoltHub remote...[/cyan]")
+
+            comparison = check_remote_signals()
+
+            # Status color mapping
+            status_colors = {
+                VersionStatus.MATCH: "green",
+                VersionStatus.DATE_MISMATCH: "yellow",
+                VersionStatus.TICKERS_MISMATCH: "yellow",
+                VersionStatus.DIVERGED: "red",
+                VersionStatus.NO_REMOTE: "dim",
+            }
+            status_color = status_colors.get(comparison["status"], "white")
+
+            table = Table(
+                title="TA 信号版本对比",
+                show_header=True,
+                header_style="bold magenta",
+                box=box.ROUNDED,
+            )
+            table.add_column("指标", justify="left")
+            table.add_column("值", justify="left")
+
+            table.add_row("状态", f"[{status_color}]{comparison['status']}[/{status_color}]")
+            table.add_row("本地日期", comparison.get("local_date", "N/A"))
+            table.add_row("远程日期", comparison.get("remote_date", "N/A"))
+            table.add_row("本地信号数", str(comparison.get("num_local", 0)))
+            table.add_row("远程信号数", str(comparison.get("num_remote", 0)))
+
+            if comparison.get("remote_version_id"):
+                table.add_row("远程版本 ID", comparison["remote_version_id"])
+            if comparison.get("remote_created_at"):
+                table.add_row("远程发布时间", comparison["remote_created_at"])
+            if comparison.get("error"):
+                table.add_row("错误", f"[red]{comparison['error']}[/red]")
+
+            console.print(table)
+
+            # Show differences if any
+            diffs = comparison.get("differences", [])
+            if diffs:
+                diff_table = Table(
+                    title="信号差异详情",
+                    show_header=True,
+                    header_style="bold magenta",
+                    box=box.ROUNDED,
+                )
+                diff_table.add_column("Ticker", justify="left")
+                diff_table.add_column("类型", justify="left")
+                diff_table.add_column("本地", justify="left")
+                diff_table.add_column("远程", justify="left")
+
+                for d in diffs[:20]:
+                    diff_table.add_row(
+                        d.get("ticker", ""),
+                        d.get("field", ""),
+                        str(d.get("local", "")),
+                        str(d.get("remote", "")),
+                    )
+
+                console.print(diff_table)
+
         else:
             console.print(f"[red]Unknown action: {action}[/red]")
-            console.print("[dim]Valid actions: scan, convert, backfill-signals, bulk-download, dolt-push[/dim]")
+            console.print("[dim]Valid actions: scan, convert, backfill-signals, bulk-download, dolt-push, ta-push, check-remote[/dim]")
             raise typer.Exit(code=1)
 
     except typer.Exit:
