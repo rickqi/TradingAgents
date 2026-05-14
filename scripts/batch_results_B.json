@@ -2,33 +2,33 @@
   {
     "ticker": "688027.SH",
     "name": "天合光能",
-    "decision": "Hold",
-    "date": "2026-05-08",
-    "time": 564.8,
-    "error": null,
-    "ai_score": 0,
-    "trader_action": 0,
-    "research_rating": 0,
-    "price_target": 700.0
-  },
-  {
-    "ticker": "300223.SZ",
-    "name": "北京君正",
     "decision": "Underweight",
     "date": "2026-05-08",
-    "time": 610.1,
+    "time": 548.5,
     "error": null,
     "ai_score": -1,
     "trader_action": -1,
     "research_rating": -1,
-    "price_target": 100.0
+    "price_target": 550.0
+  },
+  {
+    "ticker": "300223.SZ",
+    "name": "北京君正",
+    "decision": "Hold",
+    "date": "2026-05-08",
+    "time": 618.1,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 1,
+    "research_rating": 0,
+    "price_target": NaN
   },
   {
     "ticker": "301269.SZ",
     "name": "联特科技",
     "decision": "Hold",
     "date": "2026-05-08",
-    "time": 622.4,
+    "time": 505.6,
     "error": null,
     "ai_score": 0,
     "trader_action": 0,
@@ -40,223 +40,83 @@
     "name": "尚太科技",
     "decision": "Hold",
     "date": "2026-05-08",
-    "time": 612.5,
+    "time": 463.5,
     "error": null,
     "ai_score": 0,
     "trader_action": 0,
     "research_rating": 0,
-    "price_target": NaN
+    "price_target": 26.47
   },
   {
     "ticker": "688332.SH",
     "name": "联影医疗",
     "decision": "Hold",
     "date": "2026-05-08",
-    "time": 656.4,
+    "time": 619.1,
     "error": null,
     "ai_score": 0,
-    "trader_action": 0,
-    "research_rating": 0,
-    "price_target": 125.0
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
   },
   {
     "ticker": "002896.SZ",
     "name": "星帅尔",
-    "decision": "Underweight",
+    "decision": "Hold",
     "date": "2026-05-08",
-    "time": 681.4,
+    "time": 522.3,
     "error": null,
-    "ai_score": -1,
-    "trader_action": -1,
-    "research_rating": -1,
-    "price_target": 62.0
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": 80.47
   },
   {
     "ticker": "688568.SH",
     "name": "中科星图",
     "decision": "Hold",
     "date": "2026-05-08",
-    "time": 682.8,
+    "time": 607.6,
     "error": null,
     "ai_score": 0,
     "trader_action": 0,
-    "research_rating": 0,
+    "research_rating": -1,
     "price_target": NaN
   },
   {
     "ticker": "300672.SZ",
     "name": "国科微",
-    "decision": "Sell",
+    "decision": "Hold",
     "date": "2026-05-08",
-    "time": 659.8,
+    "time": 595.3,
     "error": null,
-    "ai_score": -2,
-    "trader_action": -1,
-    "research_rating": 2,
-    "price_target": 150.0
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
   },
   {
     "ticker": "300458.SZ",
     "name": "全志科技",
     "decision": "Underweight",
     "date": "2026-05-08",
-    "time": 530.2,
+    "time": 680.1,
     "error": null,
     "ai_score": -1,
-    "trader_action": 0,
+    "trader_action": -1,
     "research_rating": 0,
     "price_target": NaN
   },
   {
     "ticker": "688295.SH",
     "name": "中复神鹰",
-    "decision": "Sell",
+    "decision": "Underweight",
     "date": "2026-05-08",
-    "time": 574.6,
+    "time": 513.3,
     "error": null,
-    "ai_score": -2,
+    "ai_score": -1,
     "trader_action": -1,
     "research_rating": -1,
-    "price_target": NaN
-  },
-  {
-    "ticker": "603019.SH",
-    "name": "中科曙光",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 2.7,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "688111.SH",
-    "name": "金山办公",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 2.5,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "002230.SZ",
-    "name": "科大讯飞",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 1.4,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "002837.SZ",
-    "name": "英维克",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 1.2,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "002049.SZ",
-    "name": "紫光国微",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 0.4,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "603019.SH",
-    "name": "中科曙光",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 2.9,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "688111.SH",
-    "name": "金山办公",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 2.9,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "002230.SZ",
-    "name": "科大讯飞",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 2.7,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "002837.SZ",
-    "name": "英维克",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 2.2,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "002049.SZ",
-    "name": "紫光国微",
-    "decision": "ERROR: unsupported format string passed to NoneType.__format__",
-    "date": "2026-05-11",
-    "time": 1.6,
-    "error": "unsupported format string passed to NoneType.__format__"
-  },
-  {
-    "ticker": "603019.SH",
-    "name": "中科曙光",
-    "decision": "Hold",
-    "date": "2026-05-12",
-    "time": 613.3,
-    "error": null,
-    "ai_score": 0,
-    "trader_action": -1,
-    "research_rating": 0,
-    "price_target": NaN
-  },
-  {
-    "ticker": "688111.SH",
-    "name": "金山办公",
-    "decision": "Hold",
-    "date": "2026-05-12",
-    "time": 657.7,
-    "error": null,
-    "ai_score": 0,
-    "trader_action": 0,
-    "research_rating": 0,
-    "price_target": 300.0
-  },
-  {
-    "ticker": "002230.SZ",
-    "name": "科大讯飞",
-    "decision": "Hold",
-    "date": "2026-05-12",
-    "time": 587.3,
-    "error": null,
-    "ai_score": 0,
-    "trader_action": 0,
-    "research_rating": 0,
-    "price_target": NaN
-  },
-  {
-    "ticker": "002837.SZ",
-    "name": "英维克",
-    "decision": "Hold",
-    "date": "2026-05-12",
-    "time": 580.5,
-    "error": null,
-    "ai_score": 0,
-    "trader_action": 0,
-    "research_rating": 0,
-    "price_target": NaN
-  },
-  {
-    "ticker": "002049.SZ",
-    "name": "紫光国微",
-    "decision": "Hold",
-    "date": "2026-05-12",
-    "time": 620.1,
-    "error": null,
-    "ai_score": 0,
-    "trader_action": 0,
-    "research_rating": 0,
-    "price_target": 82.0
+    "price_target": 49.95
   }
 ]
