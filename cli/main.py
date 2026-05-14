@@ -966,16 +966,30 @@ def get_ticker():
     """Get ticker symbol from user input, preserving exchange suffixes."""
     # typer.prompt strips trailing dot-suffixes on some shells (e.g. 000404.SH
     # collapses to 000404). questionary.text reads the raw line.
+    # Supports single ticker or comma-separated list (e.g. "000858.SZ,600519.SH").
+    def _validate_ticker(value: str) -> bool:
+        v = value.strip()
+        if not v:
+            return True  # allow empty (will default to SPY)
+        # Allow comma-separated list: validate each token individually
+        tokens = [t.strip().strip('"').strip("'") for t in v.split(",")]
+        for tok in tokens:
+            tok = tok.strip()
+            if not tok:
+                continue
+            if not all(ch.isalnum() or ch in "._-^" for ch in tok):
+                return False
+            if len(tok) > 12:  # single ticker max: e.g. "7203.T" or "000858.SZ"
+                return False
+        return True
+
     ticker = questionary.text(
         "",
         validate=lambda value: (
-            not value.strip()
-            or (
-                all(ch.isalnum() or ch in "._-^" for ch in value.strip())
-                and len(value.strip()) <= 32
-            )
+            _validate_ticker(value)
         )
-        or "Please enter a valid ticker symbol, e.g. AAPL, 000404.SZ, 0700.HK.",
+        or "Please enter a valid ticker symbol, e.g. AAPL, 000404.SZ, 0700.HK. "
+           "Comma-separated lists are also supported.",
     ).ask()
 
     if ticker is None:
