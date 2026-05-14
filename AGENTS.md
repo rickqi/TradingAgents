@@ -227,6 +227,7 @@ scripts/               # 用户分析工具（不是 Python 包，无 __init__.p
 | `akshare` | A 股 | akshare | 无 | 8 | 唯一支持 `get_sentiment` |
 | `tushare` | A 股 | tushare | `TUSHARE_API_KEY` | 6 | 日线行情 + PE/PB/市值 + 财务报表 |
 | `opencli` | A 股扩展 | 无（需 npm） | 无 | 5 | 不走 VENDOR_METHODS 路由 |
+| `astock` | A 股增强 | 无（纯 Python） | 无 | 10 | a-stock-data V2.1，不走 VENDOR_METHODS 路由 |
 
 供应商路由规则：
 - `_CHINESE_VENDORS = {tencent_sina, akshare, tushare}` — A 股模式时排除西方供应商

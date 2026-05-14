@@ -34,14 +34,31 @@ def create_news_analyst(llm):
             from tradingagents.agents.utils.opencli_tools import get_announcement, get_kuaixun
             tools.extend([get_announcement, get_kuaixun])
 
+        # Add a-stock-data dragon tiger tool for A-share tickers
+        if _is_chinese_ticker(state["company_of_interest"]):
+            try:
+                from tradingagents.agents.utils.astock_tools import get_dragon_tiger_detail
+                tools.append(get_dragon_tiger_detail)
+            except ImportError:
+                pass
+
         opencli_guidance = ""
         if shutil.which("opencli") and _is_chinese_ticker(state["company_of_interest"]):
             opencli_guidance = " When analyzing A-share stocks, you may also use `get_announcement(market, limit)` for official company announcements and `get_kuaixun(column, limit)` for real-time financial news flashes."
+
+        astock_guidance = ""
+        if _is_chinese_ticker(state["company_of_interest"]):
+            astock_guidance = (
+                " You also have access to `get_dragon_tiger_detail(symbol, trade_date, look_back)` for Dragon-Tiger board (龙虎榜) data — "
+                "shows unusual institutional trading activity with buy/sell seat details and institution statistics. "
+                "Use this to detect institutional interest in the stock."
+            )
 
         system_message = (
             "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(ticker, start_date, end_date) for company-specific news (you MUST pass the exact ticker symbol as the first argument, never a company name or industry keyword), and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
         + opencli_guidance
+        + astock_guidance
         + get_language_instruction(),
         )
 

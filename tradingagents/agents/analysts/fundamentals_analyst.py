@@ -39,15 +39,39 @@ def create_fundamentals_analyst(llm):
             from tradingagents.agents.utils.opencli_tools import get_holders
             tools.append(get_holders)
 
+        # Add a-stock-data tools for A-share tickers (research reports, EPS, concepts, lockup)
+        if _is_chinese_ticker(state["company_of_interest"]):
+            try:
+                from tradingagents.agents.utils.astock_tools import (
+                    get_research_reports,
+                    get_consensus_eps,
+                    get_concept_blocks,
+                    get_lockup_expiry,
+                )
+                tools.extend([get_research_reports, get_consensus_eps, get_concept_blocks, get_lockup_expiry])
+            except ImportError:
+                pass
+
         opencli_guidance = ""
         if shutil.which("opencli") and _is_chinese_ticker(state["company_of_interest"]):
             opencli_guidance = " When analyzing A-share stocks, you may also use `get_holders(symbol)` to retrieve top 10 institutional holders and their position changes."
+
+        astock_guidance = ""
+        if _is_chinese_ticker(state["company_of_interest"]):
+            astock_guidance = (
+                " You also have access to enhanced A-share data tools:\n"
+                "- `get_consensus_eps(symbol)`: Institutional consensus EPS estimates (一致预期EPS) — critical for forward PE and PEG valuation.\n"
+                "- `get_research_reports(symbol, max_pages)`: Research reports (研报) from brokerages with ratings and 3-year EPS forecasts.\n"
+                "- `get_concept_blocks(symbol)`: Concept/industry/region classification (概念板块) — shows which themes and sectors the stock belongs to.\n"
+                "- `get_lockup_expiry(symbol, trade_date, forward_days)`: Lockup expiry calendar (限售解禁) — warns about upcoming share unlocks that could pressure the stock."
+            )
 
         system_message = (
             "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
             + opencli_guidance
+            + astock_guidance
             + get_language_instruction(),
         )
 

@@ -193,6 +193,25 @@ class TradingAgentsGraph:
             except ImportError:
                 pass
 
+        # a-stock-data tools (pure Python, always available when akshare is installed)
+        _astock_fundamentals_tools = []
+        _astock_news_tools = []
+        try:
+            from tradingagents.agents.utils.astock_tools import (
+                get_research_reports,
+                get_consensus_eps,
+                get_concept_blocks,
+                get_lockup_expiry,
+                get_dragon_tiger_detail,
+            )
+            _astock_fundamentals_tools = [
+                get_consensus_eps, get_research_reports,
+                get_concept_blocks, get_lockup_expiry,
+            ]
+            _astock_news_tools = [get_dragon_tiger_detail]
+        except ImportError:
+            pass
+
         return {
             "market": ToolNode(market_tools),
             "social": ToolNode(
@@ -211,6 +230,7 @@ class TradingAgentsGraph:
                     get_insider_transactions,
                 ]
                 + _opencli_news_tools
+                + _astock_news_tools
             ),
             "fundamentals": ToolNode(
                 [
@@ -221,6 +241,7 @@ class TradingAgentsGraph:
                     get_income_statement,
                 ]
                 + _opencli_fundamentals_tools
+                + _astock_fundamentals_tools
             ),
         }
 

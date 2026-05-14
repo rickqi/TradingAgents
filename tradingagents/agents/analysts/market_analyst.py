@@ -61,6 +61,24 @@ def _build_market_tools(include_opencli: bool = True):
         except ImportError:
             pass
 
+    # a-stock-data tools (pure Python, always available)
+    if include_opencli:
+        try:
+            from tradingagents.agents.utils.astock_tools import (
+                get_hot_stocks_with_reasons,
+                get_northbound_realtime,
+                get_industry_ranking,
+                get_full_market_dragon_tiger,
+                get_fund_flow,
+            )
+            tools.extend([
+                get_hot_stocks_with_reasons, get_northbound_realtime,
+                get_industry_ranking, get_full_market_dragon_tiger, get_fund_flow,
+            ])
+            logger.info("a-stock-data — added 5 signal tools to Market Analyst")
+        except ImportError:
+            pass
+
     return tools
 
 
@@ -100,6 +118,18 @@ def create_market_analyst(llm):
 
 When analyzing A-share stocks, consider using these tools AFTER getting stock data and indicators to enrich your report with capital flow and sector context. Call them if they would add meaningful insight to your analysis. Do NOT call all of them unconditionally — only call the ones relevant to the stock being analyzed."""
 
+        astock_tools_guidance = ""
+        if is_chinese:
+            astock_tools_guidance = """
+**a-stock-data Enhanced Signals:** You also have access to enhanced A-share signal tools:
+- `get_hot_stocks_with_reasons(date)`: Today's strong stocks with editorial reason tags (题材归因) from THS editors — tells you WHY stocks are moving, not just which ones.
+- `get_northbound_realtime()`: Real-time northbound capital flow (北向资金) minute-level data with local cache history — more detailed than OpenCLI version.
+- `get_industry_ranking(top_n)`: ~90 THS industry sectors ranked by performance (行业横向对比) with turnover and leader stocks.
+- `get_full_market_dragon_tiger(trade_date)`: All stocks on daily dragon-tiger board (全市场龙虎榜) with net buy rankings.
+- `get_fund_flow(symbol, date)`: Individual stock minute-level fund flow (个股资金流向) — main force/retail/super-large order breakdown.
+
+Use these for market context and signal enrichment when analyzing A-share stocks."""
+
         system_message = (
             """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy. Categories and each category's indicators are:
 
@@ -127,6 +157,7 @@ Volume-Based Indicators:
 
 - Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators provided above as they are defined parameters, otherwise your call will fail. Please make sure to call get_stock_data first to retrieve the CSV that is needed to generate indicators. Then use get_indicators with the specific indicator names. Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
             + opencli_tools_guidance
+            + astock_tools_guidance
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + get_language_instruction()
         )

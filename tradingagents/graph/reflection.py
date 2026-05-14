@@ -48,10 +48,15 @@ class Reflector:
             (
                 "human",
                 (
-                    f"Raw return: {raw_return:+.1%}\n"
+                    f"Raw return: {raw_return:+.1%}\n" if raw_return is not None
+                    else "Raw return: N/A\n"
+                )
+                + (
                     f"Alpha vs {benchmark_name}: {alpha_return:+.1%}\n\n"
-                    f"Final Decision:\n{final_decision}"
-                ),
+                    if alpha_return is not None
+                    else f"Alpha vs {benchmark_name}: N/A\n\n"
+                )
+                + f"Final Decision:\n{final_decision}",
             ),
         ]
         return self.quick_thinking_llm.invoke(messages).content

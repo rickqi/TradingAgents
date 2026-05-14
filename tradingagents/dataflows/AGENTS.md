@@ -19,7 +19,8 @@ dataflows/
 ├── akshare_vendor.py       # A 股: AKShare — 内幕交易, 情绪, 个股财报
 ├── twelve_data.py          # Twelve Data — REST API，9 个方法（无需额外 pip 依赖）
 ├── tushare.py              # Tushare Pro — REST API，6 个方法（需 pip install tushare）
-└── opencli_vendor.py       # A 股: OpenCLI — 11 个 A 股数据函数 + 1 个加密货币函数（可选）
+├── opencli_vendor.py       # A 股: OpenCLI — 11 个 A 股数据函数 + 1 个加密货币函数（可选）
+└── astock_vendor.py        # A 股扩展: a-stock-data — 10 个纯 Python 数据函数（研报/信号层）
 ```
 
 ## 供应商路由机制
@@ -158,3 +159,42 @@ dataflows/
 - 非阻塞：`opencli` 不在 `pyproject.toml` 依赖中，未安装时所有工具静默跳过
 - 超时 30 秒，失败返回错误字符串（不抛异常，不影响分析流水线）
 - `get_crypto_price` 是唯一的非 A 股函数，无 `@tool` 包装，仅通过 CLI `market` 子命令使用
+
+## astock_vendor（A 股增强数据层）
+
+`astock_vendor.py` 是一个独立的纯 Python 数据层，基于 [a-stock-data](https://github.com/simonlin1212/a-stock-data) V2.1。不通过 `VENDOR_METHODS` 路由，直接被 `agents/utils/astock_tools.py` 中的 `@tool` 函数调用。
+
+**零额外依赖** — 仅使用 akshare + requests + pandas（已安装）。无需 npm/opencli。
+
+**10 个 vendor 函数**（全部返回格式化 markdown 字符串，永不抛异常）：
+
+| 函数 | 数据源 | 说明 |
+|------|--------|------|
+| `get_research_reports(code, max_pages)` | 东财 reportapi | 研报列表 + 评级 + 三年EPS预测 |
+| `get_consensus_eps(code)` | akshare THS | 机构一致预期EPS（估值关键输入） |
+| `get_hot_stocks_with_reasons(date)` | 同花顺 getharden | 强势股 + 编辑部题材归因 reason tags |
+| `get_concept_blocks(code)` | 百度 PAE | 行业/概念/地域三维分类 |
+| `get_fund_flow(code, date)` | 百度 PAE | 个股分钟级资金流向（主力/散户/超大单） |
+| `get_dragon_tiger_detail(code, trade_date, look_back)` | akshare 3函数聚合 | 龙虎榜 + 买卖席位TOP5 + 机构统计 |
+| `get_lockup_expiry(code, trade_date, forward_days)` | akshare | 限售解禁日历（历史+未来预警） |
+| `get_industry_ranking(top_n)` | akshare THS | ~90 行业涨跌排名 |
+| `get_northbound_realtime()` | 同花顺 hsgtApi | 北向资金实时分钟流向 + 本地CSV自缓存 |
+| `get_full_market_dragon_tiger(trade_date)` | 东财 datacenter | 全市场龙虎榜 |
+
+**实现细节**：
+- `_normalize_ticker(code)` — 去除 sh/sz/bj 前缀和 .SZ/.SH 后缀，返回纯 6 位代码
+- `_get_prefix(code)` — 根据代码返回市场前缀
+- `_format_table(headers, rows)` — markdown 表格生成
+- 所有函数 try/except 包裹，失败返回错误字符串（不抛异常，不影响分析流水线）
+- `_MAX_ROWS = 500` 截断
+- 北向资金本地自缓存路径：`~/.tradingagents/cache/northbound_daily.csv`
+
+**与 OpenCLI 的关系**：能力部分重叠（北向/龙虎榜/板块/公告），但 astock_vendor 是纯 Python（更快更稳），且提供 OpenCLI 没有的独有能力（研报、一致预期EPS、题材归因 reason tags、限售解禁）。两者共存，互补。
+
+**工具注册分布**（通过 `astock_tools.py` 的 `@tool` 包装）：
+
+| 分析师 | astock 工具 |
+|--------|------------|
+| Market Analyst（5 个） | `get_hot_stocks_with_reasons`, `get_northbound_realtime`, `get_industry_ranking`, `get_full_market_dragon_tiger`, `get_fund_flow` |
+| Fundamentals Analyst（4 个） | `get_consensus_eps`, `get_research_reports`, `get_concept_blocks`, `get_lockup_expiry` |
+| News Analyst（1 个） | `get_dragon_tiger_detail` |
