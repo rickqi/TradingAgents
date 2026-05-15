@@ -76,7 +76,11 @@ def save_results(results):
         json.dump(results, f, ensure_ascii=False, indent=2)
 
 
-def completed_tickers(results):
+def completed_tickers(results, target_date=None):
+    """Return set of tickers already completed. If target_date given, only count results matching that date."""
+    if target_date:
+        return {r["ticker"] for r in results
+                if not r.get("error") and r.get("date") == target_date}
     return {r["ticker"] for r in results if not r.get("error")}
 
 
@@ -127,8 +131,8 @@ def main():
     # Load results from the specified file
     p = Path(results_file)
     results = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
-    done = completed_tickers(results)
-    print(f"Previously completed: {len(done)} stocks")
+    done = completed_tickers(results, target_date=args.date)
+    print(f"Previously completed for {args.date}: {len(done)} stocks")
 
     total_start = time.time()
     errors = 0

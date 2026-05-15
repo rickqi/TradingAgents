@@ -20,7 +20,7 @@ def main():
         os.path.join(SCRIPT_DIR, "batch_results_B.json"),
     ]
 
-    # ticker -> best result (prefer non-error)
+    # ticker -> best result (prefer newer date, then non-error)
     merged = {}
     for src in sources:
         for r in load_json(src):
@@ -30,8 +30,12 @@ def main():
             elif merged[t].get("error") and not r.get("error"):
                 merged[t] = r  # prefer success over error
             elif not merged[t].get("error") and not r.get("error"):
-                # both success — keep the one with more signal fields
-                if len(r) > len(merged[t]):
+                # both success — prefer newer date
+                old_date = merged[t].get("date", "")
+                new_date = r.get("date", "")
+                if new_date > old_date:
+                    merged[t] = r
+                elif new_date == old_date and len(r) > len(merged[t]):
                     merged[t] = r
 
     final = []
