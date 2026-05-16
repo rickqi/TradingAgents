@@ -1,5 +1,9 @@
-"""Merge batch_results_A.json + batch_results_B.json + batch_20_results.json into final."""
-import json, math, os, sys
+"""Merge batch_results_*.json group files + batch_20_results.json into final.
+
+Auto-discovers all batch_results_?.json files (A, B, C, D, ...) to support
+any --parallel value. For each ticker, keeps the result with the newest date.
+"""
+import json, math, os, sys, glob
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "..", "..", "docs", "scripts"))
@@ -14,11 +18,12 @@ def load_json(path):
 
 
 def main():
-    sources = [
-        os.path.join(SCRIPT_DIR, "batch_20_results.json"),
-        os.path.join(SCRIPT_DIR, "batch_results_A.json"),
-        os.path.join(SCRIPT_DIR, "batch_results_B.json"),
-    ]
+    # Auto-discover all batch_results_*.json group files (A, B, C, D, ...)
+    # Previously hardcoded A/B only, missing C/D when --parallel 4 was used.
+    group_files = sorted(
+        glob.glob(os.path.join(SCRIPT_DIR, "batch_results_?.json"))
+    )
+    sources = [os.path.join(SCRIPT_DIR, "batch_20_results.json")] + group_files
 
     # ticker -> best result (prefer newer date, then non-error)
     merged = {}
