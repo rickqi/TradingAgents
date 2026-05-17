@@ -325,6 +325,20 @@ def build_handler_dataset(
 
     df = feature_df.dropna(subset=[label_col]).copy()
 
+    # Drop last `hold_days` rows of each segment to prevent label leakage
+    # (label uses forward prices that belong to the next segment)
+    hold_days = 2  # must match the label shift in add_label()
+    for seg_name, (seg_start, seg_end) in [("train", (TRAIN_START, TRAIN_END)), 
+                                             ("valid", (VALID_START, VALID_END))]:
+        seg_mask = (df.index.get_level_values(1) >= seg_start) & \
+                   (df.index.get_level_values(1) <= seg_end)
+        seg_dates = sorted(df.loc[seg_mask].index.get_level_values(1).unique())
+        if len(seg_dates) > hold_days:
+            drop_dates = set(seg_dates[-hold_days:])
+            drop_mask = df.index.get_level_values(1).isin(drop_dates)
+            # Only drop if the date is NOT also in the next segment
+            df = df[~drop_mask | ~seg_mask]
+
     # Create MultiIndex columns: ('feature', col) and ('label', 'LABEL0')
     feat_part = df[feature_cols]
     label_part = df[[label_col]]
@@ -386,12 +400,78 @@ def predict_and_evaluate(model, dataset) -> pd.Series:
 # 4.  Simple backtesting (portfolio simulation)
 # ---------------------------------------------------------------------------
 
+def compute_ic_metrics(predictions: pd.Series, price_df: pd.DataFrame, label_shift: int = 2) -> Dict:
+    """Compute Information Coefficient (IC) between predictions and actual returns.
+    
+    IC = Pearson correlation between predicted and actual returns per date.
+    ICIR = mean(IC) / std(IC) — measures consistency of predictive power.
+    """
+    from scipy.stats import pearsonr
+    
+    # Get test dates from predictions
+    test_dates = sorted(predictions.index.get_level_values(1).unique())
+    
+    ic_values = []
+    for dt in test_dates:
+        try:
+            preds_dt = predictions.xs(dt, level=1)
+        except KeyError:
+            continue
+        if len(preds_dt) < 5:  # Need at least 5 stocks for meaningful correlation
+            continue
+        
+        # Compute actual forward returns for these stocks
+        actual_returns = {}
+        for stock in preds_dt.index:
+            try:
+                buy_price = price_df.loc[(stock, dt), "$close"]
+                # Find sell date (label_shift trading days later)
+                dt_idx = test_dates.index(dt)
+                sell_idx = min(dt_idx + label_shift, len(test_dates) - 1)
+                sell_dt = test_dates[sell_idx]
+                sell_price = price_df.loc[(stock, sell_dt), "$close"]
+                if pd.notna(buy_price) and pd.notna(sell_price) and buy_price != 0:
+                    actual_returns[stock] = (sell_price - buy_price) / buy_price
+            except (KeyError, IndexError):
+                continue
+        
+        if len(actual_returns) < 5:
+            continue
+        
+        actual_s = pd.Series(actual_returns)
+        pred_s = preds_dt.reindex(actual_s.index).dropna()
+        actual_s = actual_s.reindex(pred_s.index)
+        
+        if len(pred_s) >= 5:
+            ic, _ = pearsonr(pred_s.values, actual_s.values)
+            if not np.isnan(ic):
+                ic_values.append(ic)
+    
+    if not ic_values:
+        return {"mean_ic": 0.0, "ic_std": 0.0, "icir": 0.0, "ic_positive_ratio": 0.0, "n_dates": 0}
+    
+    ic_arr = np.array(ic_values)
+    mean_ic = float(np.mean(ic_arr))
+    ic_std = float(np.std(ic_arr))
+    icir = mean_ic / max(ic_std, 1e-8)
+    ic_pos_ratio = float(np.mean(ic_arr > 0))
+    
+    return {
+        "mean_ic": mean_ic,
+        "ic_std": ic_std,
+        "icir": icir,
+        "ic_positive_ratio": ic_pos_ratio,
+        "n_dates": len(ic_values),
+    }
+
+
 def simple_backtest(
     predictions: pd.Series,
     price_df: pd.DataFrame,
     top_k: int = 5,
     hold_days: int = 2,
     initial_capital: float = 1_000_000.0,
+    transaction_cost_rate: float = 0.003,
 ) -> Dict:
     """
     Simple top-k portfolio backtest.
@@ -469,6 +549,8 @@ def simple_backtest(
                 continue
 
         avg_return = np.mean(stock_returns) if stock_returns else 0.0
+        # Deduct transaction cost (A-share: stamp tax 0.05% sell + commission 0.025% each side + slippage)
+        avg_return -= transaction_cost_rate
         capital *= (1 + avg_return)
 
         # Record portfolio value at sell date
@@ -500,7 +582,7 @@ def simple_backtest(
     # Sharpe ratio (assuming daily risk-free rate = 0)
     if len(values) > 1:
         daily_returns = np.diff(values) / values[:-1]
-        sharpe = float(np.mean(daily_returns) / max(np.std(daily_returns), 1e-8) * np.sqrt(252))
+        sharpe = float(np.mean(daily_returns) / max(np.std(daily_returns), 1e-8) * np.sqrt(252 / hold_days))
     else:
         sharpe = 0.0
 
@@ -510,6 +592,61 @@ def simple_backtest(
         "max_drawdown": max_drawdown,
         "sharpe": sharpe,
         "n_trades": n_trades,
+        "final_capital": capital,
+    }
+
+
+def benchmark_backtest(
+    price_df: pd.DataFrame,
+    target_stocks: List[str],
+    initial_capital: float = 1_000_000.0,
+    transaction_cost_rate: float = 0.003,
+) -> Dict:
+    """Equal-weight buy-and-hold benchmark for target stocks.
+    
+    Buy at TEST_START close, hold until TEST_END close.
+    Deducts one-time transaction cost for entry.
+    """
+    test_dates = sorted(price_df.index.get_level_values(1).unique())
+    test_dates = [d for d in test_dates if str(d.date()) >= TEST_START and str(d.date()) <= TEST_END]
+    if len(test_dates) < 2:
+        return {"cum_return": 0.0, "ann_return": 0.0, "max_drawdown": 0.0, "sharpe": 0.0, "n_trades": 1,
+                "final_capital": initial_capital}
+    
+    buy_dt = test_dates[0]
+    sell_dt = test_dates[-1]
+    
+    stock_returns = []
+    for stock in target_stocks:
+        try:
+            buy_price = price_df.loc[(stock, buy_dt), "$close"]
+            sell_price = price_df.loc[(stock, sell_dt), "$close"]
+            if pd.notna(buy_price) and pd.notna(sell_price) and buy_price != 0:
+                ret = (sell_price - buy_price) / buy_price - transaction_cost_rate
+                stock_returns.append(ret)
+        except (KeyError, IndexError):
+            continue
+    
+    avg_return = np.mean(stock_returns) if stock_returns else 0.0
+    capital = initial_capital * (1 + avg_return)
+    cum_return = avg_return
+    
+    n_days = len(test_dates)
+    n_years = n_days / 252.0
+    ann_return = (1 + cum_return) ** (1 / max(n_years, 0.01)) - 1 if n_years > 0 else 0.0
+    
+    # Approximate max drawdown (since we only have start/end, assume peak at start)
+    max_drawdown = 0.0  # Buy-and-hold has no rebalancing, single period
+    
+    # Sharpe: approximate daily returns assuming linear growth
+    sharpe = 0.0  # Can't compute meaningful Sharpe from single buy-and-hold
+    
+    return {
+        "cum_return": cum_return,
+        "ann_return": ann_return,
+        "max_drawdown": max_drawdown,
+        "sharpe": sharpe,
+        "n_trades": 1,
         "final_capital": capital,
     }
 
@@ -642,6 +779,27 @@ def main():
     print("\n  === Model C (OHLCV + RD-Agent factors) ===")
     metrics_c = simple_backtest(pred_c, ohlcv_df, top_k=5, hold_days=2)
 
+    # Compute IC metrics for each model
+    print("\n  === Computing IC Metrics ===")
+    ic_a = compute_ic_metrics(pred_a, ohlcv_df, label_shift=2)
+    ic_b = compute_ic_metrics(pred_b, ohlcv_df, label_shift=2)
+    ic_c = compute_ic_metrics(pred_c, ohlcv_df, label_shift=2)
+    print(f"  Model A IC: {ic_a['mean_ic']:.4f} (ICIR={ic_a['icir']:.2f})")
+    print(f"  Model B IC: {ic_b['mean_ic']:.4f} (ICIR={ic_b['icir']:.2f})")
+    print(f"  Model C IC: {ic_c['mean_ic']:.4f} (ICIR={ic_c['icir']:.2f})")
+
+    # Update metrics dicts with IC for CSV export
+    metrics_a.update(ic_a)
+    metrics_b.update(ic_b)
+    metrics_c.update(ic_c)
+
+    # Benchmark: equal-weight buy-and-hold of 20 target stocks
+    print("\n  === Benchmark (Buy & Hold 20 target stocks) ===")
+    metrics_bench = benchmark_backtest(ohlcv_df, TARGET_STOCKS)
+    print(f"  Benchmark cumulative return: {metrics_bench['cum_return']:.2%}")
+    print(f"  Benchmark annualized return: {metrics_bench['ann_return']:.2%}")
+    print(f"  Benchmark final capital: {metrics_bench['final_capital']:,.0f}")
+
     # ------------------------------------------------------------------
     # Results summary
     # ------------------------------------------------------------------
@@ -659,6 +817,11 @@ def main():
 |  Sharpe Ratio        | {metrics_a['sharpe']:>10.2f}        | {metrics_b['sharpe']:>10.2f}         | {metrics_c['sharpe']:>10.2f}         |
 |  # Trades            | {metrics_a['n_trades']:>10d}        | {metrics_b['n_trades']:>10d}         | {metrics_c['n_trades']:>10d}         |
 |  Final Capital       | {metrics_a['final_capital']:>13,.0f}    | {metrics_b['final_capital']:>13,.0f}     | {metrics_c['final_capital']:>13,.0f}     |
+|  Mean IC             | {ic_a['mean_ic']:>10.4f}        | {ic_b['mean_ic']:>10.4f}         | {ic_c['mean_ic']:>10.4f}         |
+|  ICIR                | {ic_a['icir']:>10.2f}        | {ic_b['icir']:>10.2f}         | {ic_c['icir']:>10.2f}         |
+|  IC > 0 Ratio        | {ic_a['ic_positive_ratio']:>10.1%}        | {ic_b['ic_positive_ratio']:>10.1%}         | {ic_c['ic_positive_ratio']:>10.1%}         |
++==============================================================================+
+|  Benchmark (Buy&Hold): Cum Ret={metrics_bench['cum_return']:.2%}  Ann Ret={metrics_bench['ann_return']:.2%}  Capital={metrics_bench['final_capital']:,.0f}  |
 +==============================================================================+
 |  Universe: {len(universe)} stocks  |  Test: {TEST_START} to {TEST_END}                      |
 |  Features A: {len(OHLCV_FEATURES)} OHLCV  |  Features B: {len(all_features)} (OHLCV+AI)  |  Features C: {len(ohlcv_plus_rd_features)} (OHLCV+RD-Agent) |
