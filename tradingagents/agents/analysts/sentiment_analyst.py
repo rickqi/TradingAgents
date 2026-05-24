@@ -27,8 +27,31 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
     get_news,
 )
+from tradingagents.dataflows.guba_vendor import fetch_guba_sentiment
 from tradingagents.dataflows.reddit import fetch_reddit_posts
 from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+
+
+def _is_ashare_ticker(ticker: str) -> bool:
+    """Quick check if ticker looks like a Chinese A-share or HK stock."""
+    t = str(ticker).strip().strip('"').strip("'").strip().lower()
+    for part in t.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        for prefix in ("sh", "sz", "hk"):
+            if part.startswith(prefix):
+                part = part[len(prefix):]
+                break
+        for suffix in (".sz", ".ss", ".sh", ".hk"):
+            if part.endswith(suffix):
+                part = part[: -len(suffix)]
+                break
+        if len(part) == 6 and part.isdigit():
+            return True
+        if 4 <= len(part) <= 5 and part.isdigit():
+            return True
+    return False
 
 
 def _seven_days_back(trade_date: str) -> str:
@@ -49,12 +72,19 @@ def create_sentiment_analyst(llm):
         start_date = _seven_days_back(end_date)
         instrument_context = build_instrument_context(ticker)
 
-        # Pre-fetch all three sources. Each fetcher degrades gracefully and
+        # Pre-fetch data sources. Each fetcher degrades gracefully and
         # returns a string (no exceptions surface from here), so the LLM
         # always sees something — either real data or a clear placeholder.
         news_block = get_news.func(ticker, start_date, end_date)
-        stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
-        reddit_block = fetch_reddit_posts(ticker)
+
+        # A-share: use East Money social sentiment (not GFW-blocked)
+        is_ashare = _is_ashare_ticker(ticker)
+        if is_ashare:
+            stocktwits_block = fetch_guba_sentiment(ticker)
+            reddit_block = "<Reddit/StockTwits skipped: not available for A-share tickers>"
+        else:
+            stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
+            reddit_block = fetch_reddit_posts(ticker)
 
         system_message = _build_system_message(
             ticker=ticker,
@@ -63,6 +93,7 @@ def create_sentiment_analyst(llm):
             news_block=news_block,
             stocktwits_block=stocktwits_block,
             reddit_block=reddit_block,
+            is_ashare=is_ashare,
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -104,8 +135,37 @@ def _build_system_message(
     news_block: str,
     stocktwits_block: str,
     reddit_block: str,
+    is_ashare: bool = False,
 ) -> str:
     """Assemble the sentiment-analyst system message with structured data blocks."""
+    if is_ashare:
+        return _build_ashare_system_message(
+            ticker=ticker,
+            start_date=start_date,
+            end_date=end_date,
+            news_block=news_block,
+            stocktwits_block=stocktwits_block,
+            reddit_block=reddit_block,
+        )
+    return _build_western_system_message(
+        ticker=ticker,
+        start_date=start_date,
+        end_date=end_date,
+        news_block=news_block,
+        stocktwits_block=stocktwits_block,
+        reddit_block=reddit_block,
+    )
+
+
+def _build_western_system_message(
+    *,
+    ticker: str,
+    start_date: str,
+    end_date: str,
+    news_block: str,
+    stocktwits_block: str,
+    reddit_block: str,
+) -> str:
     return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {ticker} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
 
 ## Data sources (pre-fetched, in this prompt)
@@ -158,6 +218,87 @@ Produce a sentiment report covering, in order:
 3. **Divergences, alignments, and key narratives** across sources.
 4. **Catalysts and risks** surfaced by the data.
 5. **Markdown table** at the end summarizing key sentiment signals, their direction, source, and supporting evidence.
+
+    {get_language_instruction()}"""
+
+
+def _build_ashare_system_message(
+    *,
+    ticker: str,
+    start_date: str,
+    end_date: str,
+    news_block: str,
+    stocktwits_block: str,
+    reddit_block: str,
+) -> str:
+    """Assemble the sentiment-analyst system message for A-share tickers.
+
+    Uses East Money (东方财富) quantitative sentiment indicators instead of
+    Reddit/StockTwits (which are GFW-blocked and have no A-share content).
+    """
+    return f"""You are a financial market sentiment analyst for Chinese A-share stocks. Your task is to produce a comprehensive sentiment report for {ticker} covering the period from {start_date} to {end_date}, drawing on news and East Money quantitative sentiment data that has already been collected for you.
+
+## Data sources (pre-fetched, in this prompt)
+
+### News headlines — past 7 days
+Institutional framing. Fact-driven, slower-moving signal.
+
+<start_of_news>
+{news_block}
+<end_of_news>
+
+### 东方财富社交情绪指标 — East Money quantitative sentiment
+Quantitative sentiment indicators from East Money's stock comment system. Includes:
+- 综合得分 (composite score), 关注指数 (attention index), 机构参与度 (institutional participation)
+- 参与意愿 (participation desire) with 5-day moving average and change rate
+- Score trend and institutional participation trend over recent 30 days
+
+Read the composite score and attention index as gauges of retail/institutional interest:
+- 综合得分 > 70: strong positive sentiment; < 40: bearish
+- 关注指数 > 80: high retail attention (potential contrarian warning if score is extreme)
+- 参与意愿 rising rapidly + 关注指数 high: momentum play, watch for exhaustion
+- 机构参与度 > 50: institutional money active (more reliable signal)
+
+<start_of_stocktwits>
+{stocktwits_block}
+<end_of_stocktwits>
+
+### A股社交情绪详情
+Additional A-share sentiment data including score trends and institutional participation trends.
+Use these time-series to identify sentiment shifts and momentum changes.
+
+<start_of_reddit>
+{reddit_block}
+<end_of_reddit>
+
+## How to analyze this data (best practices for A-share)
+
+1. **Read the composite score (综合评分) as the primary sentiment gauge.** Scores above 70 indicate broad optimism; below 40 indicate pessimism. Track the score trend — a declining composite score from 75→65→55 signals deteriorating sentiment even if still nominally positive.
+
+2. **Interpret the attention index (关注指数) as a crowd-signal.** Very high attention (>80) combined with extreme scores (either direction) often signals crowded positioning and contrarian risk. Low attention with strong scores is a quieter, potentially more reliable signal.
+
+3. **Track participation desire (参与意愿) changes for momentum signals.** Rapid increases in 参与意愿 combined with rising 关注指数 indicate growing retail FOMO — often a late-cycle signal. Declining 参与意愿 after a peak suggests exhaustion.
+
+4. **Weight institutional participation (机构参与度) more heavily than retail signals.** 机构参与度 > 50 means institutional money is actively involved — a more reliable and persistent signal than retail attention alone. Track the trend: rising institutional participation is constructive; declining suggests smart money is exiting.
+
+5. **Cross-reference news with sentiment data.** If news is bearish but composite score remains high, sentiment may not have caught up. Conversely, strong news + low scores = potential mispricing opportunity.
+
+6. **Use the time-series trends to identify inflection points.** A sudden drop in composite score combined with rising 关注指数 is a classic sentiment reversal pattern. Conversely, a score recovery on declining attention may be a stealth turnaround.
+
+7. **Be honest about data limits.** If any East Money data returned "<unavailable>" or placeholder text, flag this explicitly and reduce confidence accordingly.
+
+8. **Past sentiment is not predictive.** Frame your conclusions as signal for the trader to weigh alongside fundamentals and technicals, not as a price call.
+
+## Output
+
+Produce a sentiment report covering, in order:
+
+1. **Overall sentiment direction** — Bullish / Bearish / Neutral / Mixed — with a brief confidence note based on data quality.
+2. **Source-by-source breakdown** — what the news and each East Money indicator (综合评分, 关注指数, 参与意愿, 机构参与度) is telling you, with specific values and trends.
+3. **Sentiment inflection points and momentum changes** — identify any notable shifts in the time-series data.
+4. **Divergences** between news framing and quantitative sentiment indicators.
+5. **Catalysts and risks** surfaced by the data.
+6. **Markdown table** at the end summarizing key sentiment signals, their direction, source, and supporting evidence.
 
 {get_language_instruction()}"""
 
