@@ -3,12 +3,84 @@
     "ticker": "688041.SH",
     "name": "海光信息",
     "decision": "Underweight",
-    "date": "2026-05-15",
-    "time": 331.8,
+    "date": "2026-05-22",
+    "time": 888.2,
     "error": null,
     "ai_score": -1,
+    "trader_action": -1,
+    "research_rating": 0,
+    "price_target": 256.0
+  },
+  {
+    "ticker": "688256.SH",
+    "name": "寒武纪",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 631.1,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "688012.SH",
+    "name": "中微公司",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 573.9,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "603986.SH",
+    "name": "兆易创新",
+    "decision": "Sell",
+    "date": "2026-05-22",
+    "time": 585.3,
+    "error": null,
+    "ai_score": -2,
     "trader_action": 0,
     "research_rating": 0,
-    "price_target": 255.0
+    "price_target": NaN
+  },
+  {
+    "ticker": "688008.SH",
+    "name": "澜起科技",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 579.9,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300442.SZ",
+    "name": "普丽盛",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 515.2,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "603019.SH",
+    "name": "中科曙光",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 522.1,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
   }
 ]

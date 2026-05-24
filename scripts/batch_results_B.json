@@ -3,12 +3,84 @@
     "ticker": "688111.SH",
     "name": "金山办公",
     "decision": "Hold",
-    "date": "2026-05-15",
-    "time": 357.1,
+    "date": "2026-05-22",
+    "time": 752.7,
     "error": null,
     "ai_score": 0,
     "trader_action": 0,
     "research_rating": 0,
-    "price_target": 300.0
+    "price_target": NaN
+  },
+  {
+    "ticker": "002230.SZ",
+    "name": "科大讯飞",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 627.0,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "002837.SZ",
+    "name": "英维克",
+    "decision": "Underweight",
+    "date": "2026-05-22",
+    "time": 540.0,
+    "error": null,
+    "ai_score": -1,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": 100.0
+  },
+  {
+    "ticker": "002049.SZ",
+    "name": "紫光国微",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 620.5,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "688027.SH",
+    "name": "天合光能",
+    "decision": "Buy",
+    "date": "2026-05-22",
+    "time": 654.3,
+    "error": null,
+    "ai_score": 2,
+    "trader_action": 1,
+    "research_rating": 0,
+    "price_target": 620.0
+  },
+  {
+    "ticker": "300223.SZ",
+    "name": "北京君正",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 533.6,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "301269.SZ",
+    "name": "联特科技",
+    "decision": "Hold",
+    "date": "2026-05-22",
+    "time": 553.3,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": 0,
+    "price_target": NaN
   }
 ]
