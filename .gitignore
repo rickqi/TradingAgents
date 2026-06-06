@@ -228,3 +228,7 @@ mlruns/
 
 # Qlib model outputs
 qlib_results/
+
+# Agent tool directories
+.sisyphus/
+skills/
