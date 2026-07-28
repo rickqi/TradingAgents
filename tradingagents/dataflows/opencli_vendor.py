@@ -480,7 +480,7 @@ def get_crypto_price(
     if _get_opencli_path() is None:
         return "Error: opencli not found in PATH. Install with: npm install -g @jackwener/opencli"
 
-    args = ["--symbol", symbol]
+    args = [symbol]  # opencli v1.8.6+: symbol is a positional argument, not --symbol flag
 
     try:
         data = _run_opencli("binance", "price", args, timeout=10)
