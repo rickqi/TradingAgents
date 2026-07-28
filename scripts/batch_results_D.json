@@ -1,10 +1,22 @@
 [
   {
-    "ticker": "300857.SZ",
-    "name": "协创数据",
+    "ticker": "002460.SZ",
+    "name": "赣锋锂业",
     "decision": "Hold",
-    "date": "2026-06-09",
-    "time": 1465.4,
+    "date": "2026-07-27",
+    "time": 367.2,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": -1,
+    "research_rating": 0,
+    "price_target": NaN
+  },
+  {
+    "ticker": "603927.SH",
+    "name": "",
+    "decision": "Hold",
+    "date": "2026-07-27",
+    "time": 347.8,
     "error": null,
     "ai_score": 0,
     "trader_action": 0,
@@ -12,39 +24,39 @@
     "price_target": NaN
   },
   {
-    "ticker": "002714.SZ",
-    "name": "牧原股份",
+    "ticker": "601899.SH",
+    "name": "紫金矿业",
+    "decision": "Overweight",
+    "date": "2026-07-27",
+    "time": 294.2,
+    "error": null,
+    "ai_score": 1,
+    "trader_action": 0,
+    "research_rating": 0,
+    "price_target": 36.0
+  },
+  {
+    "ticker": "688525.SH",
+    "name": "佰维存储",
+    "decision": "Hold",
+    "date": "2026-07-27",
+    "time": 323.3,
+    "error": null,
+    "ai_score": 0,
+    "trader_action": 0,
+    "research_rating": -1,
+    "price_target": NaN
+  },
+  {
+    "ticker": "300308.SZ",
+    "name": "中际旭创",
     "decision": "Underweight",
-    "date": "2026-06-09",
-    "time": 1141.2,
+    "date": "2026-07-27",
+    "time": 320.4,
     "error": null,
     "ai_score": -1,
     "trader_action": -1,
     "research_rating": -1,
-    "price_target": 30.0
-  },
-  {
-    "ticker": "600111.SH",
-    "name": "北方稀土",
-    "decision": "Underweight",
-    "date": "2026-06-09",
-    "time": 599.7,
-    "error": null,
-    "ai_score": -1,
-    "trader_action": 0,
-    "research_rating": -1,
-    "price_target": 42.0
-  },
-  {
-    "ticker": "002460.SZ",
-    "name": "赣锋锂业",
-    "decision": "Hold",
-    "date": "2026-06-09",
-    "time": 967.0,
-    "error": null,
-    "ai_score": 0,
-    "trader_action": 0,
-    "research_rating": 0,
-    "price_target": NaN
+    "price_target": 960.0
   }
 ]
